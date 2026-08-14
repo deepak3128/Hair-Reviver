@@ -201,9 +201,13 @@ function ApptCard(props){
       a.status === 'scheduled' ? React.createElement(React.Fragment, null,
         React.createElement(Btn, { size: 'sm', kind: 'primary', onClick: function(){ setApptStatus(st, set, a, 'inprogress'); } }, 'Start'),
         React.createElement(Btn, { size: 'sm', kind: 'ghost', icon: 'wa', onClick: function(){ if (c) openWhatsApp(c.phone, apptReminder(c, a)); } }, 'Remind'),
+        React.createElement(Btn, { size: 'sm', kind: 'ghost', icon: 'edit', onClick: function(){ props.onEdit(a); } }, 'Reschedule'),
         React.createElement(Btn, { size: 'sm', kind: 'ghost', onClick: function(){ setApptStatus(st, set, a, 'noshow'); } }, 'No-show'),
         React.createElement(Btn, { size: 'sm', kind: 'quiet', onClick: function(){ setApptStatus(st, set, a, 'cancelled'); } }, 'Cancel')
-      ) : a.status === 'inprogress' ? React.createElement(Btn, { size: 'sm', kind: 'primary', onClick: function(){ completeAppt(st, set, a); } }, 'Complete')
+      ) : a.status === 'inprogress' ? React.createElement(React.Fragment, null,
+          React.createElement(Btn, { size: 'sm', kind: 'primary', onClick: function(){ completeAppt(st, set, a); } }, 'Complete'),
+          React.createElement(Btn, { size: 'sm', kind: 'ghost', icon: 'edit', onClick: function(){ props.onEdit(a); } }, 'Reschedule')
+        )
         : (a.status === 'noshow' || a.status === 'cancelled') && canBook
           ? React.createElement(Btn, { size: 'sm', kind: 'ghost', icon: 'repeat', onClick: function(){ props.onEdit(a); } }, 'Re-book')
           : null
