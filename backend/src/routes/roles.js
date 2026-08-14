@@ -1,9 +1,10 @@
 const express = require('express');
 const RolePerm = require('../models/RolePerm');
 const { auth, requireRole } = require('../middleware/auth');
+const { clinicOnly } = require('../middleware/network');
 
 const router = express.Router();
-router.use(auth);
+router.use(auth, clinicOnly);
 
 const DEFAULTS = {
   staff: ['dashboard', 'clients', 'client', 'appointments', 'billing'],

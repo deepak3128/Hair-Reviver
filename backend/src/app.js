@@ -16,6 +16,9 @@ const roleRoutes = require('./routes/roles');
 
 const app = express();
 
+// Behind a reverse proxy (Render/Railway/Nginx) the real client IP comes via
+// X-Forwarded-For. Required for the clinic-network gate to see actual IPs.
+app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
 

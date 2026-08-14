@@ -3,9 +3,10 @@ const Appointment = require('../models/Appointment');
 const Client = require('../models/Client');
 const { nextId } = require('../utils/ids');
 const { auth, requireRole } = require('../middleware/auth');
+const { clinicOnly } = require('../middleware/network');
 
 const router = express.Router();
-router.use(auth);
+router.use(auth, clinicOnly);
 
 const STATUSES = ['scheduled', 'inprogress', 'completed', 'noshow', 'cancelled'];
 

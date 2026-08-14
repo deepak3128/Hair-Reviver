@@ -3,9 +3,10 @@ const User = require('../models/User');
 const Appointment = require('../models/Appointment');
 const { today, addDays, thisMonth } = require('../utils/dates');
 const { auth, requireRole } = require('../middleware/auth');
+const { clinicOnly } = require('../middleware/network');
 
 const router = express.Router();
-router.use(auth, requireRole('owner'));
+router.use(auth, clinicOnly, requireRole('owner'));
 
 router.get('/', async (req, res, next) => {
   try {

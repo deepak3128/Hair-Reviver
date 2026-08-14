@@ -3,9 +3,10 @@ const Client = require('../models/Client');
 const { nextId } = require('../utils/ids');
 const { nextDue, statusOf, daysUntil } = require('../utils/dates');
 const { auth, requireRole } = require('../middleware/auth');
+const { clinicOnly } = require('../middleware/network');
 
 const router = express.Router();
-router.use(auth);
+router.use(auth, clinicOnly);
 
 function decorate(c) {
   const obj = typeof c.toObject === 'function' ? c.toObject() : c;

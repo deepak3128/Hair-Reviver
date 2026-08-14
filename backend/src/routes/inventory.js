@@ -4,9 +4,10 @@ const Purchase = require('../models/Purchase');
 const { nextId } = require('../utils/ids');
 const { today } = require('../utils/dates');
 const { auth, requireRole } = require('../middleware/auth');
+const { clinicOnly } = require('../middleware/network');
 
 const router = express.Router();
-router.use(auth);
+router.use(auth, clinicOnly);
 
 router.get('/', async (req, res, next) => {
   try {

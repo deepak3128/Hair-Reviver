@@ -5,10 +5,11 @@ const Invoice = require('../models/Invoice');
 const InventoryItem = require('../models/InventoryItem');
 const User = require('../models/User');
 const { auth } = require('../middleware/auth');
+const { clinicOnly } = require('../middleware/network');
 const { today, thisMonth, prevMonths, addDays, nextDue, statusOf } = require('../utils/dates');
 
 const router = express.Router();
-router.use(auth);
+router.use(auth, clinicOnly);
 
 router.get('/summary', async (req, res, next) => {
   try {
