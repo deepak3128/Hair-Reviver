@@ -1,7 +1,9 @@
-/* views-dashboard.jsx — Owner dashboard + Technician "my day" */
-var UT = window.UT;
-var DB = window.DB;
-var U = window.UI;
+/* views/dashboard.jsx — Owner dashboard + Technician "my day" */
+import React from 'react';
+import DB, { UT } from '../lib/data';
+import { UI as U } from '../lib/ui';
+import { APP } from './appointments';
+import { OPS } from './operations';
 var Icon = U.Icon, Chip = U.Chip, Avatar = U.Avatar, Card = U.Card, Section = U.Section,
     Btn = U.Btn, Empty = U.Empty, Bars = U.Bars, Kpi = U.Kpi, toast = U.toast;
 
@@ -160,14 +162,14 @@ function OwnerDash(props){
     ),
 
     bookClient[0]
-      ? React.createElement(window.APP.BookModal, {
+      ? React.createElement(APP.BookModal, {
           st: st, set: set, nav: nav,
           onClose: function(){ bookClient[1](null); },
           preset: bookClient[0]
         })
       : null,
     payInv[0]
-      ? React.createElement(window.OPS.PaymentModal, {
+      ? React.createElement(OPS.PaymentModal, {
           invoice: payInv[0], st: st, set: set,
           onClose: function(){ payInv[1](null); }
         })
@@ -254,4 +256,4 @@ function TechDash(props){
   );
 }
 
-window.DASH = { OwnerDash: OwnerDash, TechDash: TechDash };
+export const DASH = { OwnerDash: OwnerDash, TechDash: TechDash };

@@ -1,7 +1,8 @@
-/* views-operations.jsx — inventory, billing, staff, reports + shared modals */
-var UT = window.UT;
-var DB = window.DB;
-var U = window.UI;
+/* views/operations.jsx — inventory, billing, staff, reports + shared modals */
+import React from 'react';
+import DB, { UT } from '../lib/data';
+import { UI as U } from '../lib/ui';
+import { DEFAULT_PERMS } from '../lib/permissions';
 var Icon = U.Icon, Chip = U.Chip, Avatar = U.Avatar, Card = U.Card, Section = U.Section,
     Field = U.Field, Select = U.Select, Input = U.Input, Btn = U.Btn, Modal = U.Modal,
     Empty = U.Empty, toast = U.toast;
@@ -421,11 +422,11 @@ var ACCESS_ROLES = [
 ];
 function RoleAccess(props){
   var st = props.st, set = props.set;
-  var perms = st.perms || window.DEFAULT_PERMS;
+  var perms = st.perms || DEFAULT_PERMS;
   function has(role, view){ return (perms[role] || []).indexOf(view) >= 0; }
   function toggle(role, view){
     set(function(s){
-      var cur = s.perms || window.DEFAULT_PERMS;
+      var cur = s.perms || DEFAULT_PERMS;
       var list = (cur[role] || []).slice();
       var i = list.indexOf(view);
       if (i >= 0){
@@ -739,4 +740,4 @@ function Reports(props){
   );
 }
 
-window.OPS = { PaymentModal: PaymentModal, RestockModal: RestockModal, DeductModal: DeductModal, PkgBuyModal: PkgBuyModal, Inventory: Inventory, Billing: Billing, StaffView: StaffView, Reports: Reports };
+export const OPS = { PaymentModal: PaymentModal, RestockModal: RestockModal, DeductModal: DeductModal, PkgBuyModal: PkgBuyModal, Inventory: Inventory, Billing: Billing, StaffView: StaffView, Reports: Reports };

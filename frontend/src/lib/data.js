@@ -3,7 +3,7 @@
    Simulated "today" is pinned to 2026-08-13 so the prototype
    always renders coherent data regardless of when it is opened.
    ============================================================ */
-window.DB = (function () {
+const DB = (function () {
 
   var TODAY = '2026-08-13';
   var DAY = 86400000;
@@ -52,7 +52,6 @@ window.DB = (function () {
       return p + (max + 1);
     }
   };
-  window.UT = UT;
 
   /* ---------------- Clients ---------------- */
   var clients = [
@@ -185,6 +184,7 @@ window.DB = (function () {
   ];
 
   return {
+    UT: UT,
     clients: clients,
     technicians: technicians,
     staff: staff,
@@ -196,3 +196,6 @@ window.DB = (function () {
     packages: packages
   };
 })();
+
+export const UT = DB.UT;
+export default DB;

@@ -1,19 +1,16 @@
 /* app.jsx — root: state store, role-based auth, shell, routing */
-var UT = window.UT;
-var DB = window.DB;
-var U = window.UI;
+import React from 'react';
+import DB, { UT } from './lib/data';
+import { UI as U } from './lib/ui';
+import { DASH } from './views/dashboard';
+import { CLIENTS } from './views/clients';
+import { APP } from './views/appointments';
+import { OPS } from './views/operations';
+import { DEFAULT_PERMS, ROLE_LABEL, HOME } from './lib/permissions';
 var Icon = U.Icon, Avatar = U.Avatar, Chip = U.Chip, Btn = U.Btn, Field = U.Field, Input = U.Input, toast = U.toast, ToastHost = U.ToastHost;
 
 var KEY = 'hr-crm-v1';
 var SEED = 1;
-var DEFAULT_PERMS = {
-  owner: ['dashboard','clients','client','appointments','inventory','billing','staff','reports'],
-  staff: ['dashboard','clients','client','appointments','billing'],
-  technician: ['dashboard','appointments','inventory']
-};
-window.DEFAULT_PERMS = DEFAULT_PERMS;
-var HOME = { owner: 'dashboard', staff: 'dashboard', technician: 'dashboard' };
-var ROLE_LABEL = { owner: 'Owner / Admin', staff: 'Front Desk', technician: 'Technician' };
 var TITLES = {
   dashboard: 'Dashboard', clients: 'Clients', client: 'Client profile', appointments: 'Appointments',
   inventory: 'Patch inventory', billing: 'Billing & payments', staff: 'Staff & team', reports: 'Reports'
@@ -264,4 +261,4 @@ function Root(){
   });
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Root, null));
+export default Root;

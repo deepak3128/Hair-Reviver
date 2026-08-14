@@ -1,7 +1,7 @@
-/* views-appointments.jsx — day/week schedule, booking, status lifecycle */
-var UT = window.UT;
-var DB = window.DB;
-var U = window.UI;
+/* views/appointments.jsx — day/week schedule, booking, status lifecycle */
+import React from 'react';
+import DB, { UT } from '../lib/data';
+import { UI as U } from '../lib/ui';
 var Icon = U.Icon, Chip = U.Chip, Avatar = U.Avatar, Card = U.Card, Section = U.Section,
     Field = U.Field, Select = U.Select, Input = U.Input, Btn = U.Btn, Modal = U.Modal,
     Empty = U.Empty, toast = U.toast;
@@ -311,4 +311,4 @@ function Appointments(props){
   );
 }
 
-window.APP = { BookModal: BookModal, Appointments: Appointments, completeAppt: completeAppt };
+export const APP = { BookModal: BookModal, Appointments: Appointments, completeAppt: completeAppt };

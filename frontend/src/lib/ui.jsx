@@ -1,5 +1,7 @@
 /* ui.jsx — shared primitives: icons, chips, cards, modals, charts */
-var UT = window.UT;
+import React from 'react';
+import { createPortal } from 'react-dom';
+import { UT } from './data';
 
 var ICONS = {
   dashboard: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
@@ -149,7 +151,7 @@ function Btn(props){
 }
 
 function Modal(props){
-  return ReactDOM.createPortal(
+  return createPortal(
     React.createElement('div', { className: 'overlay', onClick: props.onClose },
       React.createElement('div', { className: 'modal' + (props.wide ? ' wide' : ''), onClick: function(e){ e.stopPropagation(); } },
         React.createElement('div', { className: 'modal-head' },
@@ -228,7 +230,7 @@ function ToastHost(){
   );
 }
 
-window.UI = {
+export const UI = {
   ICONS: ICONS,
   Icon: Icon,
   Chip: Chip,

@@ -1,7 +1,9 @@
-/* views-clients.jsx — client list, client profile, add-client flow */
-var UT = window.UT;
-var DB = window.DB;
-var U = window.UI;
+/* views/clients.jsx — client list, client profile, add-client flow */
+import React from 'react';
+import DB, { UT } from '../lib/data';
+import { UI as U } from '../lib/ui';
+import { APP } from './appointments';
+import { OPS } from './operations';
 var Icon = U.Icon, Chip = U.Chip, Avatar = U.Avatar, Card = U.Card, Section = U.Section,
     Field = U.Field, Select = U.Select, Input = U.Input, Btn = U.Btn, Modal = U.Modal,
     Empty = U.Empty, toast = U.toast;
@@ -335,13 +337,13 @@ function ClientDetail(props){
       )
     ),
 
-    book[0] ? React.createElement(window.APP.BookModal, {
+    book[0] ? React.createElement(APP.BookModal, {
       st: st, set: set, nav: nav, onClose: function(){ book[1](false); }, preset: { clientId: id }
     }) : null,
-    pay[0] ? React.createElement(window.OPS.PaymentModal, {
+    pay[0] ? React.createElement(OPS.PaymentModal, {
       invoice: pay[0], st: st, set: set, onClose: function(){ pay[1](null); }
     }) : null
   );
 }
 
-window.CLIENTS = { ClientList: ClientList, ClientDetail: ClientDetail, ClientForm: ClientForm };
+export const CLIENTS = { ClientList: ClientList, ClientDetail: ClientDetail, ClientForm: ClientForm };

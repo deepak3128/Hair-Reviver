@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 
@@ -29,9 +30,15 @@ app.use('/api/staff', staffRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/roles', roleRoutes);
 
-// Serve the frontend prototype from the repo root so one server runs the whole app.
-const ROOT = path.join(__dirname, '..', '..');
-app.use(express.static(ROOT));
+// Serve the built frontend (Vite) so a single server runs the whole app.
+const DIST = path.join(__dirname, '..', '..', 'frontend', 'dist');
+if (fs.existsSync(path.join(DIST, 'index.html'))) {
+  app.use(express.static(DIST));
+} else {
+  app.get('/', (req, res) =>
+    res.status(200).send('Frontend not built yet. Run "npm run build" from the project root, then restart. API is live under /api.')
+  );
+}
 
 app.use('/api', notFound);
 app.use(errorHandler);
