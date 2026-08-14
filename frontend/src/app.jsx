@@ -2,6 +2,7 @@
 import React from 'react';
 import DB, { UT } from './lib/data';
 import { UI as U } from './lib/ui';
+import { API, login, logout, me, setToken, getToken, setAuthHandler, loadAll } from './lib/api';
 import { DASH } from './views/dashboard';
 import { CLIENTS } from './views/clients';
 import { APP } from './views/appointments';
@@ -9,8 +10,6 @@ import { OPS } from './views/operations';
 import { DEFAULT_PERMS, ROLE_LABEL, HOME } from './lib/permissions';
 var Icon = U.Icon, Avatar = U.Avatar, Chip = U.Chip, Btn = U.Btn, Field = U.Field, Input = U.Input, toast = U.toast, ToastHost = U.ToastHost;
 
-var KEY = 'hr-crm-v1';
-var SEED = 1;
 var TITLES = {
   dashboard: 'Dashboard', clients: 'Clients', client: 'Client profile', appointments: 'Appointments',
   inventory: 'Patch inventory', billing: 'Billing & payments', staff: 'Staff & team', reports: 'Reports'
@@ -25,43 +24,27 @@ var NAVS = [
   { view: 'reports', label: 'Reports', icon: 'chart' }
 ];
 
-function seed(){
-  return {
-    seed: SEED,
-    user: null,
-    route: { view: 'dashboard', params: {} },
-    clients: DB.clients.map(function(c){ return Object.assign({}, c); }),
-    appointments: DB.appointments.map(function(a){ return Object.assign({}, a, { reminder: Object.assign({}, a.reminder) }); }),
-    invoices: DB.invoices.map(function(i){ return Object.assign({}, i, { items: i.items.map(function(x){ return Object.assign({}, x); }) }); }),
-    inventory: DB.inventory.map(function(x){ return Object.assign({}, x); }),
-    purchases: DB.purchases.map(function(p){ return Object.assign({}, p); }),
-    packages: DB.packages.map(function(p){ return Object.assign({}, p, { members: p.members.slice() }); }),
-    perms: { owner: DEFAULT_PERMS.owner.slice(), staff: DEFAULT_PERMS.staff.slice(), technician: DEFAULT_PERMS.technician.slice() }
-  };
-}
-function loadState(){
-    try {
-      var raw = localStorage.getItem(KEY);
-      if (raw){
-        var s = JSON.parse(raw);
-        if (s && s.seed === SEED && s.clients && s.appointments){
-          if (!s.perms) s.perms = { owner: DEFAULT_PERMS.owner.slice(), staff: DEFAULT_PERMS.staff.slice(), technician: DEFAULT_PERMS.technician.slice() };
-          return s;
-        }
-      }
-    } catch (e) {}
-  return seed();
-}
-
 /* ---------------- Login ---------------- */
+var DEMO = {
+  owner: { email: 'neeraj@hairreviver.in', label: 'Neeraj Gupta', role: 'Owner / Admin', desc: 'Full access — dashboards, clients, billing, inventory, staff, reports' },
+  staff: { email: 'ritu@hairreviver.in', label: 'Ritu Sharma', role: 'Front Desk', desc: 'Clients, appointment booking and billing entry' },
+  technician: { email: 'meghna@hairreviver.in', label: 'Meghna Verma', role: 'Technician', desc: 'My appointments, service status and stock usage' }
+};
 function Login(props){
-  var roles = [
-    { id: 'owner', icon: 'chart', name: 'Neeraj Gupta', role: 'Owner / Admin', desc: 'Full access — dashboards, clients, billing, inventory, staff, reports', user: { id: 'U-01', name: 'Neeraj Gupta', role: 'owner' } },
-    { id: 'staff', icon: 'calendar', name: 'Ritu Sharma', role: 'Front Desk', desc: 'Clients, appointment booking and billing entry', user: { id: 'S-01', name: 'Ritu Sharma', role: 'staff' } },
-    { id: 'technician', icon: 'scissors', name: 'Meghna Verma', role: 'Technician', desc: 'My appointments, service status and stock usage', user: { id: 'T-01', name: 'Meghna Verma', role: 'technician', techId: 'T-01' } }
-  ];
-  var apptsThisMonth = DB.appointments.filter(function(a){ return a.date.slice(0, 7) === UT.today().slice(0, 7); }).length;
-  var outstanding = DB.invoices.filter(function(i){ return i.status !== 'paid'; }).reduce(function(s, i){ return s + (i.total - i.paid); }, 0);
+  var email = React.useState('');
+  var pass = React.useState('');
+  var busy = React.useState('');
+  var err = React.useState('');
+
+  function doLogin(e, p){
+    if (e && e.preventDefault) e.preventDefault();
+    err[1]('');
+    busy[1](p || 'form');
+    props.onLogin(email[0].trim() || (DEMO[p] ? DEMO[p].email : ''), p ? 'demo1234' : pass[0])
+      .then(function(){})
+      .catch(function(ex){ err[1](ex.message || 'Sign in failed'); })
+      .then(function(){ busy[1](''); });
+  }
 
   return React.createElement('div', { className: 'login' },
     React.createElement('div', { className: 'login-brand' },
@@ -78,31 +61,35 @@ function Login(props){
       ),
       React.createElement('div', { className: 'lb-stats' },
         React.createElement('div', { className: 'lb-stat' }, React.createElement('div', { className: 'n' }, DB.clients.length), React.createElement('div', { className: 'l' }, 'Active clients')),
-        React.createElement('div', { className: 'lb-stat' }, React.createElement('div', { className: 'n' }, apptsThisMonth), React.createElement('div', { className: 'l' }, 'Appointments this month')),
-        React.createElement('div', { className: 'lb-stat' }, React.createElement('div', { className: 'n' }, UT.fmtINR(outstanding)), React.createElement('div', { className: 'l' }, 'Outstanding dues'))
+        React.createElement('div', { className: 'lb-stat' }, React.createElement('div', { className: 'n' }, DB.appointments.length), React.createElement('div', { className: 'l' }, 'Appointments seeded')),
+        React.createElement('div', { className: 'lb-stat' }, React.createElement('div', { className: 'n' }, '3', React.createElement('small', null, ' roles')), React.createElement('div', { className: 'l' }, 'Demo accounts'))
       )
     ),
     React.createElement('div', { className: 'login-form' },
       React.createElement('h1', null, 'Sign in to the clinic'),
-      React.createElement('p', { className: 'lf-sub' }, 'This is a working demo prototype — choose a role to explore the CRM. All data is simulated in your browser.'),
-      roles.map(function(r){
-        return React.createElement('button', { key: r.id, className: 'role-card', 'data-od-id': 'login-role-' + r.id, onClick: function(){ props.onLogin(r.user); } },
-          React.createElement('div', { className: 'rc-ic' }, React.createElement(Icon, { i: r.icon, size: 19 })),
+      React.createElement('p', { className: 'lf-sub' }, 'Connected to the live clinic server. Use a demo account below or your own login.'),
+      Object.keys(DEMO).map(function(k){
+        var d = DEMO[k];
+        return React.createElement('button', { key: k, className: 'role-card', 'data-od-id': 'login-role-' + k, disabled: !!busy[0], onClick: function(){ doLogin({ preventDefault: function(){} }, k); } },
+          React.createElement('div', { className: 'rc-ic' }, React.createElement(Icon, { i: k === 'owner' ? 'chart' : k === 'staff' ? 'calendar' : 'scissors', size: 19 })),
           React.createElement('div', { style: { minWidth: 0, flex: 1 } },
-            React.createElement('div', { className: 'rc-name' }, r.name),
-            React.createElement('div', { className: 'rc-role' }, r.role),
-            React.createElement('div', { className: 'rc-desc' }, r.desc)
+            React.createElement('div', { className: 'rc-name' }, d.label),
+            React.createElement('div', { className: 'rc-role' }, d.role, ' · ', k === 'owner' ? 'works anywhere' : 'clinic Wi-Fi only'),
+            React.createElement('div', { className: 'rc-desc' }, d.desc)
           ),
-          React.createElement(Icon, { i: 'chevRight', size: 18, cls: 'chev' })
+          busy[0] === k ? React.createElement('span', { className: 'rc-busy' }, '…') : React.createElement(Icon, { i: 'chevRight', size: 18, cls: 'chev' })
         );
       }),
-      React.createElement('div', { className: 'lf-sep' }, 'or'),
-      React.createElement('div', { className: 'lf-row' },
-        React.createElement(Field, { label: 'Email' }, React.createElement(Input, { placeholder: 'you@hairreviver.in' })),
-        React.createElement(Field, { label: 'Password' }, React.createElement(Input, { type: 'password', placeholder: '••••••••' }))
+      React.createElement('div', { className: 'lf-sep' }, 'or sign in with email'),
+      React.createElement('form', { onSubmit: function(e){ doLogin(e, ''); } },
+        React.createElement('div', { className: 'lf-row' },
+          React.createElement(Field, { label: 'Email' }, React.createElement(Input, { placeholder: 'you@hairreviver.in', value: email[0], onChange: function(e){ email[1](e.target.value); } })),
+          React.createElement(Field, { label: 'Password' }, React.createElement(Input, { type: 'password', placeholder: '••••••••', value: pass[0], onChange: function(e){ pass[1](e.target.value); } }))
+        ),
+        err[0] ? React.createElement('div', { className: 'lf-err' }, err[0]) : null,
+        React.createElement(Btn, { kind: 'primary', type: 'submit', icon: 'check', disabled: !!busy[0] }, busy[0] === 'form' ? 'Signing in…' : 'Sign in')
       ),
-      React.createElement(Btn, { kind: 'primary', onClick: function(){ toast('Use a demo role above to sign in', 'err'); } }, 'Sign in'),
-      React.createElement('div', { className: 'lf-note' }, 'Prototype data only · no real client information is stored')
+      React.createElement('div', { className: 'lf-note' }, 'Front Desk & Technician sign in works only on the clinic network · demo password: demo1234')
     )
   );
 }
@@ -231,8 +218,19 @@ function Shell(props){
 }
 
 /* ---------------- Root ---------------- */
+function emptyState(){
+  return {
+    user: null,
+    booting: true,
+    route: { view: 'dashboard', params: {} },
+    clients: [], appointments: [], invoices: [], inventory: [], purchases: [],
+    packages: DB.packages.map(function(p){ return Object.assign({}, p, { members: p.members.slice() }); }),
+    perms: { owner: DEFAULT_PERMS.owner.slice(), staff: DEFAULT_PERMS.staff.slice(), technician: DEFAULT_PERMS.technician.slice() }
+  };
+}
+
 function Root(){
-  var s0 = React.useState(loadState);
+  var s0 = React.useState(emptyState);
   var st = s0[0], setRaw = s0[1];
   var nav = function(view, params){
     setRaw(function(s){ return Object.assign({}, s, { route: { view: view, params: params || {} } }); });
@@ -240,13 +238,46 @@ function Root(){
   var set = function(patch){
     setRaw(function(s){ return typeof patch === 'function' ? Object.assign({}, s, patch(s)) : Object.assign({}, s, patch); });
   };
-  React.useEffect(function(){
-    try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {}
-  }, [st]);
 
+  async function hydrate(u){
+    try {
+      var data = await loadAll();
+      set(function(s){ return Object.assign({}, s, data, { user: u, booting: false }); });
+    } catch (e) {
+      setToken(null);
+      set({ user: null, booting: false });
+      toast('Could not load clinic data: ' + (e.message || 'server unreachable'), 'err');
+    }
+  }
+  function onLogin(email, password){
+    set({ booting: true });
+    return login(email, password).then(function(u){ return hydrate(u); });
+  }
+  function doLogout(){
+    logout();
+    set({ user: null, route: { view: 'dashboard', params: {} } });
+  }
+
+  React.useEffect(function(){
+    setAuthHandler(function(){
+      setToken(null);
+      set(function(s){ return Object.assign({}, s, { user: null, booting: false }); });
+    });
+    var t = getToken();
+    if (!t){ set({ booting: false }); return; }
+    me().then(function(res){ return hydrate(res.user); })
+      .catch(function(){ setToken(null); set({ booting: false }); });
+  }, []);
+
+  if (st.booting){
+    return React.createElement('div', { className: 'boot' },
+      React.createElement('div', { className: 'boot-spin' }),
+      React.createElement('div', { className: 'boot-txt' }, 'Loading clinic…')
+    );
+  }
   if (!st.user){
     return React.createElement(React.Fragment, null,
-      React.createElement(Login, { onLogin: function(user){ set({ user: user }); } }),
+      React.createElement(Login, { onLogin: onLogin }),
       React.createElement(ToastHost, null)
     );
   }
@@ -257,7 +288,7 @@ function Root(){
   var view = allowed ? st.route.view : (perm[0] || 'dashboard');
   return React.createElement(Shell, {
     st: st, set: set, nav: nav, view: view, u: u, perm: perm,
-    logout: function(){ set({ user: null, route: { view: 'dashboard', params: {} } }); }
+    logout: doLogout
   });
 }
 

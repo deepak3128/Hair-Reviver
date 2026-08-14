@@ -391,6 +391,15 @@ textarea.input{height:auto;min-height:92px;padding:10px 12px;resize:vertical;lin
 .lf-sep::before,.lf-sep::after{content:"";flex:1;height:1px;background:var(--border)}
 .lf-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
 .lf-note{font-size:12px;color:var(--faint);text-align:center;margin-top:14px}
+.lf-err{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn);border-radius:10px;font-size:12.5px;padding:9px 12px;margin-bottom:12px}
+.role-card:disabled{opacity:.55;cursor:wait;transform:none}
+.role-card .rc-busy{margin-left:auto;font-weight:600;color:var(--accent-strong)}
+
+/* ---------------- Boot screen ---------------- */
+.boot{position:fixed;inset:0;display:grid;place-items:center;align-content:center;gap:14px;background:var(--bg)}
+.boot-spin{width:34px;height:34px;border-radius:50%;border:3px solid var(--border-strong);border-top-color:var(--accent);animation:spin .8s linear infinite}
+.boot-txt{color:var(--muted);font-size:13px;letter-spacing:.02em}
+@keyframes spin{to{transform:rotate(360deg)}}
 
 /* ---------------- Modal ---------------- */
 .overlay{position:fixed;inset:0;background:oklch(0.2 0.02 90 / .5);backdrop-filter:blur(3px);display:grid;place-items:center;z-index:100;padding:20px;animation:fade .18s ease}

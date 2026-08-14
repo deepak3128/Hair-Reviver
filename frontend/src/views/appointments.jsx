@@ -2,6 +2,8 @@
 import React from 'react';
 import DB, { UT } from '../lib/data';
 import { UI as U } from '../lib/ui';
+import { API } from '../lib/api';
+import { apptReminder, openWhatsApp } from '../lib/wa';
 var Icon = U.Icon, Chip = U.Chip, Avatar = U.Avatar, Card = U.Card, Section = U.Section,
     Field = U.Field, Select = U.Select, Input = U.Input, Btn = U.Btn, Modal = U.Modal,
     Empty = U.Empty, toast = U.toast;
@@ -40,31 +42,32 @@ function BookModal(props){
     if (isPatchWork && item && item.qty <= item.thr){
       toast('Heads up: ' + c.patchType + ' ' + c.base + ' is low in stock (' + item.qty + ' left)', 'err');
     }
-
-    if (existing){
-      set(function(s){
-        return { appointments: s.appointments.map(function(a){
-          if (a.id !== existing.id) return a;
-          return Object.assign({}, a, {
-            clientId: f.clientId[0], service: f.service[0], techId: f.techId[0],
-            date: f.date[0], time: f.time[0], dur: parseInt(f.dur[0], 10),
-            reminder: { channel: f.channel[0], daysBefore: parseInt(f.daysBefore[0], 10) }
+    var payload = {
+      clientId: f.clientId[0], service: f.service[0], techId: f.techId[0],
+      date: f.date[0], time: f.time[0], dur: parseInt(f.dur[0], 10),
+      reminder: { channel: f.channel[0], daysBefore: parseInt(f.daysBefore[0], 10) }
+    };
+    var req = existing
+      ? API.put('/appointments/' + existing.id, payload)
+      : API.post('/appointments', payload);
+    req
+      .then(function(res){
+        if (existing){
+          set(function(s){
+            return { appointments: s.appointments.map(function(a){
+              if (a.id !== existing.id) return a;
+              return res.appointment;
+            }) };
           });
-        }) };
-      });
-      toast('Appointment updated · ' + UT.fmtDate(f.date[0]) + ' at ' + f.time[0]);
-    } else {
-      var a = {
-        id: UT.nextId(st.appointments, 'A-'),
-        clientId: f.clientId[0], techId: f.techId[0], service: f.service[0],
-        date: f.date[0], time: f.time[0], dur: parseInt(f.dur[0], 10),
-        status: 'scheduled', reminder: { channel: f.channel[0], daysBefore: parseInt(f.daysBefore[0], 10) }
-      };
-      set(function(s){ return { appointments: s.appointments.concat(a) }; });
-      toast('Appointment booked · ' + UT.fmtDate(f.date[0]) + ' at ' + f.time[0]);
-      if (nav && f.date[0] === UT.today()) nav('appointments', { date: f.date[0] });
-    }
-    props.onClose();
+          toast('Appointment updated · ' + UT.fmtDate(f.date[0]) + ' at ' + f.time[0]);
+        } else {
+          set(function(s){ return { appointments: s.appointments.concat(res.appointment) }; });
+          toast('Appointment booked · ' + UT.fmtDate(f.date[0]) + ' at ' + f.time[0]);
+          if (nav && f.date[0] === UT.today()) nav('appointments', { date: f.date[0] });
+        }
+        props.onClose();
+      })
+      .catch(function(ex){ toast(ex.message, 'err'); });
   }
 
   var fee = UT.svcFee[f.service[0]] || 0;
@@ -136,35 +139,51 @@ function BookModal(props){
 
 /* ---------------- Status lifecycle actions ---------------- */
 function setApptStatus(st, set, a, status){
-  set(function(s){
-    return { appointments: s.appointments.map(function(x){ return x.id === a.id ? Object.assign({}, x, { status: status }) : x; }) };
-  });
-  toast(status === 'inprogress' ? 'Started — service in progress' : status === 'noshow' ? 'Marked as no-show' : status === 'cancelled' ? 'Appointment cancelled' : 'Status updated');
+  API.patch('/appointments/' + a.id + '/status', { status: status })
+    .then(function(res){
+      set(function(s){
+        return { appointments: s.appointments.map(function(x){ return x.id === a.id ? res.appointment : x; }) };
+      });
+      toast(status === 'inprogress' ? 'Started — service in progress' : status === 'noshow' ? 'Marked as no-show' : status === 'cancelled' ? 'Appointment cancelled' : 'Status updated');
+    })
+    .catch(function(ex){ toast(ex.message, 'err'); });
 }
 
 function completeAppt(st, set, a){
   var c = clientOf(st, a.clientId);
-  set(function(s){
-    var appts = s.appointments.map(function(x){ return x.id === a.id ? Object.assign({}, x, { status: 'completed' }) : x; });
-    var clients = c ? s.clients.map(function(x){ return x.id === c.id ? Object.assign({}, x, { lastService: a.date }) : x; }) : s.clients;
-    var invoices = s.invoices;
-    if (c && !s.invoices.find(function(i){ return i.apptId === a.id; })){
-      var items = [{ label: a.service + ' — ' + c.name, amount: UT.svcFee[a.service] || 0 }];
-      if (a.service === 'New Patch' || a.service === 'Replacement'){
-        var pc = UT.PATCHCOST[c.patchType] ? (UT.PATCHCOST[c.patchType][c.base] || 0) : 0;
-        items.unshift({ label: c.patchType + ' ' + c.base + ' patch', amount: pc });
-      }
-      var total = items.reduce(function(s2, i){ return s2 + i.amount; }, 0);
-      invoices = s.invoices.concat({
-        id: UT.nextId(s.invoices, 'INV-'), date: a.date, clientId: c.id, items: items,
-        total: total, paid: 0, status: 'pending', apptId: a.id
-      });
-      toast('Service completed · invoice raised (pending)');
-      return { appointments: appts, clients: clients, invoices: invoices };
+  var items = [];
+  if (c){
+    items.push({ label: a.service + ' — ' + c.name, amount: UT.svcFee[a.service] || 0 });
+    if (a.service === 'New Patch' || a.service === 'Replacement'){
+      var pc = c.patchType ? (UT.PATCHCOST[c.patchType] ? (UT.PATCHCOST[c.patchType][c.base] || 0) : 0) : 0;
+      items.unshift({ label: c.patchType + ' ' + c.base + ' patch', amount: pc });
     }
-    toast('Service completed');
-    return { appointments: appts, clients: clients };
-  });
+  }
+  var existing = st.invoices.find(function(i){ return i.apptId === a.id; });
+  API.patch('/appointments/' + a.id + '/status', { status: 'completed' })
+    .then(function(resAppt){
+      var update = { appointments: st.appointments.map(function(x){ return x.id === a.id ? resAppt.appointment : x; }) };
+      var invPromise = Promise.resolve(null);
+      if (c && !existing){
+        invPromise = API.post('/invoices', { clientId: c.id, date: a.date, apptId: a.id, items: items });
+      }
+      return invPromise.then(function(resInv){
+        if (resInv){
+          update.invoices = st.invoices.concat(resInv.invoice);
+          toast('Service completed · invoice raised (pending)');
+        } else {
+          toast('Service completed');
+        }
+        if (c){
+          return API.put('/clients/' + c.id, { lastService: a.date }).then(function(resC){
+            update.clients = st.clients.map(function(x){ return x.id === c.id ? resC.client : x; });
+            set(update);
+          });
+        }
+        set(update);
+      });
+    })
+    .catch(function(ex){ toast(ex.message, 'err'); });
 }
 
 function ApptCard(props){
@@ -181,6 +200,7 @@ function ApptCard(props){
     React.createElement('div', { className: 'appt-acts' },
       a.status === 'scheduled' ? React.createElement(React.Fragment, null,
         React.createElement(Btn, { size: 'sm', kind: 'primary', onClick: function(){ setApptStatus(st, set, a, 'inprogress'); } }, 'Start'),
+        React.createElement(Btn, { size: 'sm', kind: 'ghost', icon: 'wa', onClick: function(){ if (c) openWhatsApp(c.phone, apptReminder(c, a)); } }, 'Remind'),
         React.createElement(Btn, { size: 'sm', kind: 'ghost', onClick: function(){ setApptStatus(st, set, a, 'noshow'); } }, 'No-show'),
         React.createElement(Btn, { size: 'sm', kind: 'quiet', onClick: function(){ setApptStatus(st, set, a, 'cancelled'); } }, 'Cancel')
       ) : a.status === 'inprogress' ? React.createElement(Btn, { size: 'sm', kind: 'primary', onClick: function(){ completeAppt(st, set, a); } }, 'Complete')

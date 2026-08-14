@@ -2,8 +2,10 @@
 import React from 'react';
 import DB, { UT } from '../lib/data';
 import { UI as U } from '../lib/ui';
+import { API } from '../lib/api';
 import { APP } from './appointments';
 import { OPS } from './operations';
+import { openWhatsApp, clientMsg } from '../lib/wa';
 var Icon = U.Icon, Chip = U.Chip, Avatar = U.Avatar, Card = U.Card, Section = U.Section,
     Field = U.Field, Select = U.Select, Input = U.Input, Btn = U.Btn, Modal = U.Modal,
     Empty = U.Empty, toast = U.toast;
@@ -143,16 +145,19 @@ function ClientForm(props){
     e.preventDefault();
     if (!f.name[0].trim() || !f.phone[0].trim() || !f.city[0].trim()){ toast('Please fill name, phone and city', 'err'); return; }
     var c = {
-      id: UT.nextId(st.clients, 'C-'),
       name: f.name[0].trim(), phone: f.phone[0].trim(), city: f.city[0].trim(), gender: '—',
       patchType: f.patchType[0], base: f.base[0], vendor: f.vendor[0], attach: f.attach[0],
       cycle: parseInt(f.cycle[0], 10) || 3, lastService: f.lastService[0], joined: UT.today(),
       packageId: null, notes: f.notes[0].trim()
     };
-    set(function(s){ return { clients: s.clients.concat(c) }; });
-    props.onClose();
-    toast(c.name + ' added — next maintenance auto-scheduled');
-    nav('client', { id: c.id });
+    API.post('/clients', c)
+      .then(function(res){
+        set(function(s){ return { clients: s.clients.concat(res.client) }; });
+        props.onClose();
+        toast(res.client.name + ' added — next maintenance auto-scheduled');
+        nav('client', { id: res.client.id });
+      })
+      .catch(function(ex){ toast(ex.message, 'err'); });
   }
   return React.createElement(Modal, { title: 'Add new client', onClose: props.onClose, wide: true },
     React.createElement('form', { onSubmit: submit },
@@ -217,10 +222,14 @@ function ClientDetail(props){
   var bal = balanceOf(st, id);
 
   function saveNotes(){
-    set(function(s){
-      return { clients: s.clients.map(function(x){ return x.id === id ? Object.assign({}, x, { notes: notesDraft[0] }) : x; }) };
-    });
-    toast('Notes saved for ' + c.name);
+    API.put('/clients/' + id, { notes: notesDraft[0] })
+      .then(function(res){
+        set(function(s){
+          return { clients: s.clients.map(function(x){ return x.id === id ? res.client : x; }) };
+        });
+        toast('Notes saved for ' + c.name);
+      })
+      .catch(function(ex){ toast(ex.message, 'err'); });
   }
 
   return React.createElement('div', null,
@@ -239,6 +248,7 @@ function ClientDetail(props){
         )
       ),
       React.createElement('div', { className: 'page-actions' },
+        React.createElement(Btn, { icon: 'wa', kind: 'ghost', onClick: function(){ openWhatsApp(c.phone, clientMsg(c)); }, dataid: 'btn-wa-client' }, 'WhatsApp'),
         React.createElement(Btn, { icon: 'plus', kind: 'primary', onClick: function(){ book[1](true); }, dataid: 'btn-book-appointment' }, 'Book appointment')
       )
     ),

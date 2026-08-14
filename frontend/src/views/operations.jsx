@@ -2,7 +2,9 @@
 import React from 'react';
 import DB, { UT } from '../lib/data';
 import { UI as U } from '../lib/ui';
+import { API } from '../lib/api';
 import { DEFAULT_PERMS } from '../lib/permissions';
+import { openWhatsApp, invoiceMsg } from '../lib/wa';
 var Icon = U.Icon, Chip = U.Chip, Avatar = U.Avatar, Card = U.Card, Section = U.Section,
     Field = U.Field, Select = U.Select, Input = U.Input, Btn = U.Btn, Modal = U.Modal,
     Empty = U.Empty, toast = U.toast;
@@ -18,15 +20,15 @@ function PaymentModal(props){
   function save(){
     var pay = Math.min(Math.max(0, parseInt(amt[0], 10) || 0), due);
     if (pay <= 0){ toast('Enter an amount to collect', 'err'); return; }
-    props.set(function(s){
-      return { invoices: s.invoices.map(function(i){
-        if (i.id !== inv.id) return i;
-        var paid = i.paid + pay;
-        return Object.assign({}, i, { paid: paid, status: paid >= i.total ? 'paid' : 'partial' });
-      }) };
-    });
-    props.onClose();
-    toast('Payment recorded · ' + UT.fmtINR(pay) + ' collected');
+    API.post('/invoices/' + inv.id + '/payments', { amount: pay, method: 'Cash' })
+      .then(function(res){
+        props.set(function(s){
+          return { invoices: s.invoices.map(function(i){ return i.id === inv.id ? res.invoice : i; }) };
+        });
+        props.onClose();
+        toast('Payment recorded · ' + UT.fmtINR(pay) + ' collected');
+      })
+      .catch(function(ex){ toast(ex.message, 'err'); });
   }
   return React.createElement(Modal, { title: 'Collect payment · ' + inv.id, onClose: props.onClose },
     React.createElement('div', { className: 'dl', style: { marginBottom: 16 } },
@@ -72,17 +74,18 @@ function RestockModal(props){
     if (!n || n <= 0){ toast('Enter a quantity', 'err'); return; }
     var s = skus.find(function(x){ return x.id === sel[0]; });
     var unit = parseInt(cost[0], 10) || s.cost;
-    props.set(function(st){
-      return {
-        inventory: st.inventory.map(function(x){ return x.id === s.id ? Object.assign({}, x, { qty: x.qty + n, cost: unit, received: UT.today() }) : x; }),
-        purchases: [{
-          id: UT.nextId(st.purchases, 'PR-'), date: UT.today(), vendor: s.vendor,
-          item: s.type + ' ' + s.base + ' ×' + n, qty: n, cost: unit * n
-        }].concat(st.purchases)
-      };
-    });
-    props.onClose();
-    toast('Stock logged · +' + n + ' ' + s.base + ' received');
+    API.post('/inventory/' + s.id + '/restock', { qty: n, cost: unit, vendor: s.vendor })
+      .then(function(res){
+        props.set(function(st){
+          return {
+            inventory: st.inventory.map(function(x){ return x.id === s.id ? res.item : x; }),
+            purchases: [res.purchase].concat(st.purchases)
+          };
+        });
+        props.onClose();
+        toast('Stock logged · +' + n + ' ' + s.base + ' received');
+      })
+      .catch(function(ex){ toast(ex.message, 'err'); });
   }
   return React.createElement(Modal, { title: 'Log stock received', onClose: props.onClose },
     React.createElement(Field, { label: 'Item (SKU)' },
@@ -110,11 +113,15 @@ function DeductModal(props){
     var n = parseInt(qty[0], 10);
     if (!n || n <= 0){ toast('Enter a quantity', 'err'); return; }
     var s = skus.find(function(x){ return x.id === sel[0]; });
-    props.set(function(st){
-      return { inventory: st.inventory.map(function(x){ return x.id === s.id ? Object.assign({}, x, { qty: Math.max(0, x.qty - n) }) : x; }) };
-    });
-    props.onClose();
-    toast('Stock deducted · −' + n + ' (' + reason[0].toLowerCase() + ')');
+    API.post('/inventory/' + s.id + '/deduct', { qty: n })
+      .then(function(res){
+        props.set(function(st){
+          return { inventory: st.inventory.map(function(x){ return x.id === s.id ? res.item : x; }) };
+        });
+        props.onClose();
+        toast('Stock deducted · −' + n + ' (' + reason[0].toLowerCase() + ')');
+      })
+      .catch(function(ex){ toast(ex.message, 'err'); });
   }
   return React.createElement(Modal, { title: 'Deduct stock on use', onClose: props.onClose },
     React.createElement(Field, { label: 'Item (SKU)' },
@@ -321,7 +328,10 @@ function Billing(props){
                 React.createElement('td', { className: 'al-r hide-sm' }, React.createElement('span', { className: 'mono tnum' }, UT.fmtINR(inv.paid))),
                 React.createElement('td', { className: 'al-r' }, React.createElement(Chip, { s: inv.status, onClick: function(){ pay[1](inv); } }, inv.status)),
                 React.createElement('td', null,
-                  invDue(inv) > 0 ? React.createElement(Btn, { size: 'xs', kind: 'ghost', onClick: function(){ pay[1](inv); } }, 'Collect') : React.createElement(Icon, { i: 'check', size: 16, cls: 'ok' })
+                  React.createElement('div', { className: 'btn-row', style: { justifyContent: 'flex-end' } },
+                    c ? React.createElement(Btn, { size: 'xs', kind: 'quiet', icon: 'wa', onClick: function(){ openWhatsApp(c.phone, invoiceMsg(c, inv)); } }, 'WhatsApp') : null,
+                    invDue(inv) > 0 ? React.createElement(Btn, { size: 'xs', kind: 'ghost', onClick: function(){ pay[1](inv); } }, 'Collect') : React.createElement(Icon, { i: 'check', size: 16, cls: 'ok' })
+                  )
                 )
               );
             })
@@ -350,6 +360,7 @@ function Billing(props){
                 React.createElement('div', { className: 'lr-sub' }, c ? c.phone : '', ' · ', inv.id, ' · ', UT.fmtShort(inv.date))
               ),
               React.createElement(Chip, { s: inv.status }, inv.status),
+              c ? React.createElement(Btn, { size: 'sm', kind: 'quiet', icon: 'wa', onClick: function(){ openWhatsApp(c.phone, invoiceMsg(c, inv)); } }, 'WhatsApp') : null,
               React.createElement(Btn, { size: 'sm', kind: 'ghost', onClick: function(){ pay[1](inv); } }, 'Collect')
             );
           })
@@ -369,23 +380,29 @@ function PkgBuyModal(props){
   function buy(){
     var c = clientOf(st, sel[0]);
     if (!c){ toast('Select a client', 'err'); return; }
-    set(function(s){
-      var invoices = s.invoices;
-      if (!invoices.find(function(i){ return i.apptId === 'PKG-' + pkg.id + '-' + c.id; })){
-        invoices = s.invoices.concat({
-          id: UT.nextId(s.invoices, 'INV-'), date: UT.today(), clientId: c.id,
-          items: [{ label: pkg.name, amount: pkg.price }], total: pkg.price, paid: pkg.price,
-          status: 'paid', apptId: 'PKG-' + pkg.id + '-' + c.id
+    var tag = 'PKG-' + pkg.id + '-' + c.id;
+    var exists = st.invoices.find(function(i){ return i.apptId === tag; });
+    var invReq = exists
+      ? Promise.resolve(null)
+      : API.post('/invoices', { clientId: c.id, date: UT.today(), items: [{ label: pkg.name, amount: pkg.price }], apptId: tag })
+          .then(function(created){ return API.post('/invoices/' + created.invoice.id + '/payments', { amount: pkg.price, method: 'Cash' }).then(function(paid){ return paid.invoice; }); });
+    invReq
+      .then(function(inv){
+        return API.put('/clients/' + c.id, { packageId: pkg.id }).then(function(resC){
+          set(function(s){
+            return {
+              clients: s.clients.map(function(x){ return x.id === c.id ? resC.client : x; }),
+              packages: s.packages.map(function(p){ return p.id === pkg.id ? Object.assign({}, p, { members: p.members.indexOf(c.id) < 0 ? p.members.concat(c.id) : p.members }) : p; }),
+              invoices: inv ? s.invoices.concat(inv) : s.invoices
+            };
+          });
         });
-      }
-      return {
-        clients: s.clients.map(function(x){ return x.id === c.id ? Object.assign({}, x, { packageId: pkg.id }) : x; }),
-        packages: s.packages.map(function(p){ return p.id === pkg.id ? Object.assign({}, p, { members: p.members.indexOf(c.id) < 0 ? p.members.concat(c.id) : p.members }) : p; }),
-        invoices: invoices
-      };
-    });
-    props.onClose();
-    toast(pkg.name + ' purchased for ' + c.name);
+      })
+      .then(function(){
+        props.onClose();
+        toast(pkg.name + ' purchased for ' + c.name);
+      })
+      .catch(function(ex){ toast(ex.message, 'err'); });
   }
   return React.createElement(Modal, { title: 'Purchase · ' + pkg.name, onClose: props.onClose },
     React.createElement('div', { className: 'dl', style: { marginBottom: 16 } },
@@ -425,20 +442,27 @@ function RoleAccess(props){
   var perms = st.perms || DEFAULT_PERMS;
   function has(role, view){ return (perms[role] || []).indexOf(view) >= 0; }
   function toggle(role, view){
-    set(function(s){
-      var cur = s.perms || DEFAULT_PERMS;
-      var list = (cur[role] || []).slice();
-      var i = list.indexOf(view);
-      if (i >= 0){
-        list.splice(i, 1);
-        if (view === 'clients'){ var c = list.indexOf('client'); if (c >= 0) list.splice(c, 1); }
-      } else {
-        list.push(view);
-        if (view === 'clients' && list.indexOf('client') < 0) list.push('client');
-      }
-      return { perms: Object.assign({}, cur, (function(){ var o = {}; o[role] = list; return o; })()) };
-    });
-    toast(has(role, view) ? (view + ' access removed for ' + role) : (view + ' access granted for ' + role), has(role, view) ? 'err' : 'ok');
+    var cur = st.perms || DEFAULT_PERMS;
+    var list = (cur[role] || []).slice();
+    var wasOn = list.indexOf(view) >= 0;
+    var i = list.indexOf(view);
+    if (i >= 0){
+      list.splice(i, 1);
+      if (view === 'clients'){ var c = list.indexOf('client'); if (c >= 0) list.splice(c, 1); }
+    } else {
+      list.push(view);
+      if (view === 'clients' && list.indexOf('client') < 0) list.push('client');
+    }
+    var target = list;
+    API.put('/roles/' + role, { modules: target })
+      .then(function(res){
+        set(function(s){
+          var p = Object.assign({}, s.perms, (function(){ var o = {}; o[role] = res.modules; return o; })());
+          return { perms: p };
+        });
+        toast(wasOn ? (view + ' access removed for ' + role) : (view + ' access granted for ' + role), wasOn ? 'err' : 'ok');
+      })
+      .catch(function(ex){ toast(ex.message, 'err'); });
   }
   return React.createElement('div', { className: 'card', style: { marginTop: 24 } },
     React.createElement('div', { className: 'card-head', style: { paddingBottom: 4 } },

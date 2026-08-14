@@ -2,6 +2,7 @@
 import React from 'react';
 import DB, { UT } from '../lib/data';
 import { UI as U } from '../lib/ui';
+import { API } from '../lib/api';
 import { APP } from './appointments';
 import { OPS } from './operations';
 var Icon = U.Icon, Chip = U.Chip, Avatar = U.Avatar, Card = U.Card, Section = U.Section,
@@ -189,10 +190,14 @@ function TechDash(props){
   var lowStock = st.inventory.filter(function(x){ return x.qty <= x.thr; });
 
   function setStatus(id, status){
-    set(function(s){
-      return { appointments: s.appointments.map(function(a){ return a.id === id ? Object.assign({}, a, { status: status }) : a; }) };
-    });
-    toast(status === 'inprogress' ? 'Service started' : status === 'completed' ? 'Marked as completed' : status === 'noshow' ? 'Marked as no-show' : 'Updated');
+    API.patch('/appointments/' + id + '/status', { status: status })
+      .then(function(res){
+        set(function(s){
+          return { appointments: s.appointments.map(function(a){ return a.id === id ? res.appointment : a; }) };
+        });
+        toast(status === 'inprogress' ? 'Service started' : status === 'completed' ? 'Marked as completed' : status === 'noshow' ? 'Marked as no-show' : 'Updated');
+      })
+      .catch(function(ex){ toast(ex.message, 'err'); });
   }
 
   return React.createElement('div', null,
