@@ -18,7 +18,8 @@ const appointmentSchema = new mongoose.Schema(
     reminder: {
       channel: { type: String, default: 'WhatsApp' },
       daysBefore: { type: Number, default: 1 }
-    }
+    },
+    reminderSentAt: { type: Date, default: null, index: true }
   },
   { timestamps: true }
 );

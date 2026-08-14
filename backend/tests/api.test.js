@@ -95,3 +95,30 @@ test('invoices and reports respond', async () => {
   const roles = await (await fetch(base + '/api/roles', { headers: h })).json();
   assert.deepEqual(roles.owner.sort(), ['appointments', 'billing', 'client', 'clients', 'dashboard', 'inventory', 'reports', 'staff'].sort());
 });
+
+test('reminders: unauthenticated is rejected', async () => {
+  const r = await fetch(base + '/api/reminders');
+  assert.equal(r.status, 401);
+});
+
+test('reminders: owner can list due reminders and mark one sent', async () => {
+  const { token } = await (await login('neeraj@hairreviver.in', 'demo1234')).json();
+  const h = { Authorization: 'Bearer ' + token };
+
+  const list = await (await fetch(base + '/api/reminders', { headers: h })).json();
+  assert.ok(Array.isArray(list.reminders));
+
+  const target = list.reminders[0];
+  if (target) {
+    assert.ok(target.link && target.link.indexOf('https://wa.me/') === 0);
+    assert.ok(target.text && target.clientName);
+
+    const mark = await fetch(base + '/api/reminders/appointments/' + target.id + '/reminder-sent', { method: 'PATCH', headers: h });
+    assert.equal(mark.status, 200);
+    const body = await mark.json();
+    assert.ok(body.appointment.reminderSentAt);
+
+    const again = await (await fetch(base + '/api/reminders', { headers: h })).json();
+    assert.ok(!again.reminders.some((r) => r.id === target.id));
+  }
+});

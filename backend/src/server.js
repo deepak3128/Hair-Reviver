@@ -1,6 +1,7 @@
 const { connect, PORT } = require('./config/env');
 const app = require('./app');
 const { seed } = require('./seed/seed');
+const { startReminderScheduler } = require('./services/reminders');
 
 (async () => {
   await connect();
@@ -10,6 +11,7 @@ const { seed } = require('./seed/seed');
     console.log('  API docs:   /api/health');
     console.log('  Frontend:   / (served from repo root)');
   });
+  startReminderScheduler();
 })().catch((err) => {
   console.error('Failed to start server:', err);
   process.exit(1);

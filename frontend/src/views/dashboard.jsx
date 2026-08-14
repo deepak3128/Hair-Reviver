@@ -5,6 +5,7 @@ import { UI as U } from '../lib/ui';
 import { API } from '../lib/api';
 import { APP } from './appointments';
 import { OPS } from './operations';
+import { openWhatsApp, apptReminder } from '../lib/wa';
 var Icon = U.Icon, Chip = U.Chip, Avatar = U.Avatar, Card = U.Card, Section = U.Section,
     Btn = U.Btn, Empty = U.Empty, Bars = U.Bars, Kpi = U.Kpi, toast = U.toast;
 
@@ -55,6 +56,24 @@ function OwnerDash(props){
   var bookClient = React.useState(null);
   var payInv = React.useState(null);
 
+  function markReminderSent(a){
+    API.patch('/reminders/appointments/' + a.id + '/reminder-sent')
+      .then(function(res){
+        set(function(s){
+          return { appointments: s.appointments.map(function(x){ return x.id === a.id ? Object.assign({}, x, { reminderSentAt: res.appointment.reminderSentAt }) : x; }) };
+        });
+        toast('Reminder marked as sent');
+      })
+      .catch(function(ex){ toast(ex.message, 'err'); });
+  }
+  var dueReminders = st.appointments.filter(function(a){
+    if (a.status !== 'scheduled' || !a.reminder) return false;
+    if (a.reminder.channel !== 'WhatsApp' || a.reminderSentAt) return false;
+    var x = UT.parse(a.date);
+    var remDay = UT.fmt(new Date(x.getFullYear(), x.getMonth(), x.getDate() - (a.reminder.daysBefore || 1)));
+    return a.date >= today && remDay <= today;
+  }).sort(function(a, b){ return a.date === b.date ? a.time.localeCompare(b.time) : a.date < b.date ? -1 : 1; });
+
   return React.createElement('div', null,
     React.createElement('div', { className: 'grid-kpi', 'data-od-id': 'dashboard-kpis' },
       React.createElement(Kpi, { icon: 'calendar', label: 'Today’s appointments', value: apptsToday.length, sub: React.createElement(React.Fragment, null, React.createElement('b', null, scheduledNow), ' scheduled · ', React.createElement('b', null, inProg), ' in progress', React.createElement('br', null), React.createElement('b', null, noshowNow), ' no-show'), dataid: 'kpi-appts-today' }),
@@ -62,6 +81,28 @@ function OwnerDash(props){
       React.createElement(Kpi, { icon: 'users', label: 'Active clients', value: st.clients.length, sub: React.createElement(React.Fragment, null, React.createElement('b', null, overdue.length), ' overdue for maintenance'), dataid: 'kpi-clients' }),
       React.createElement(Kpi, { icon: 'alert', label: 'Overdue maintenance', value: overdue.length, tone: overdue.length ? 'danger' : 'a', sub: 'auto-reminders enabled · WhatsApp', dataid: 'kpi-overdue' })
     ),
+
+    dueReminders.length
+      ? React.createElement(Section, {
+          title: 'WhatsApp reminders due', sub: 'Automatically picked per appointment — one tap to send',
+          cls: 'reminder-panel', dataid: 'reminders-due'
+        },
+          React.createElement('div', { className: 'list-rows' },
+            dueReminders.slice(0, 8).map(function(a){
+              var c = clientOf(st, a.clientId);
+              return React.createElement('div', { className: 'list-row', key: a.id, 'data-od-id': 'reminder-' + a.id },
+                React.createElement(Avatar, { name: c ? c.name : '?', size: 34 }),
+                React.createElement('div', { className: 'lr-main' },
+                  React.createElement('div', { className: 'lr-title' }, c ? c.name : '—', ' · ', a.service),
+                  React.createElement('div', { className: 'lr-sub' }, UT.fmtDate(a.date), ' at ', a.time, ' · ', c ? c.phone : '')
+                ),
+                React.createElement(Btn, { size: 'sm', kind: 'ghost', icon: 'wa', onClick: function(){ if (c) openWhatsApp(c.phone, apptReminder(c, a)); } }, 'Send'),
+                React.createElement(Btn, { size: 'sm', kind: 'quiet', icon: 'check', onClick: function(){ markReminderSent(a); } }, 'Mark sent')
+              );
+            })
+          )
+      )
+      : null,
 
     React.createElement('div', { className: 'grid2' },
       React.createElement(Section, { title: 'Revenue — last 7 days', sub: 'Collected across invoices', cls: '', dataid: 'revenue-chart' },

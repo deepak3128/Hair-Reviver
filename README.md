@@ -13,6 +13,7 @@ Manages clients, appointments, patch inventory, billing, staff roles and reports
 - **Dashboard** — today's schedule, revenue chart, overdue maintenance, pending payments, technician view
 - **Clients** — add/edit clients, patch profile (type/base/vendor/attach), maintenance cycle, auto-computed due dates, notes, WhatsApp contact
 - **Appointments** — book, reschedule to any later day, start / no-show / cancel / complete; completing a service auto-raises the invoice; day & week views; WhatsApp reminder per appointment
+- **Automatic WhatsApp reminders** — a scheduler picks appointments whose reminder is due (appointment date − days before) and shows them on the dashboard with one-tap send; connect the WhatsApp Cloud API to send them fully automatically
 - **Inventory** — patch stock with reorder thresholds, restock logging (vendor purchase log), usage deduction, low-stock warnings
 - **Billing** — invoices raised from completed services, partial payments, WhatsApp invoice reminders, pending follow-up list
 - **Staff & roles** — owner / front desk (staff) / technician; per-role module permissions that can be toggled from the UI
@@ -82,6 +83,24 @@ Copy `backend/.env.example` to `backend/.env` and adjust if needed:
 | `SIM_TODAY`        | Demo date for "overdue / due today / this month". Leave empty for the real date. |
 | `MONGOMS_DISTRO`   | In-memory MongoDB binary flavor. Ubuntu-based distros (incl. Kali) need `ubuntu2204`. |
 | `CLINIC_NETWORKS`  | Comma-separated CIDRs the staff/technician gate allows. Default: `192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,127.0.0.0/8` |
+| `WHATSAPP_TOKEN`   | WhatsApp Cloud API token. Leave empty to keep manual one-tap reminder buttons. |
+| `WHATSAPP_PHONE_ID`| WhatsApp Cloud API phone number ID (required together with the token). |
+| `REMINDER_INTERVAL_MS` | How often the reminder scheduler checks, in ms (default `300000` = 5 min). |
+
+### Persistent data (MongoDB Atlas)
+
+By default the app runs on an in-memory MongoDB — data is lost when the server stops. For a real clinic, use a free MongoDB Atlas cluster:
+
+1. Create a free cluster at [mongodb.com/atlas](https://www.mongodb.com/atlas) → **Database Access** → add a user → **Network Access** → allow your clinic IP (or `0.0.0.0/0` for simplicity).
+2. **Connect → Drivers** → copy the connection string, e.g. `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority`.
+3. Paste it into `backend/.env` as `MONGODB_URI=…` and restart the server. The app seeds demo data once, then everything you add persists.
+
+### Automatic WhatsApp reminders
+
+Two levels, both work out of the box:
+
+- **Manual (default):** the dashboard shows a "WhatsApp reminders due" panel listing appointments whose reminder is due today — one tap opens WhatsApp with the reminder message pre-filled, plus a "Mark sent" button.
+- **Automatic:** set `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_ID` (WhatsApp Cloud API / Meta — see [the Meta get-started guide](https://developers.facebook.com/docs/whatsapp/cloud-api/get-started)). The scheduler then sends each due reminder itself and records it as sent. `REMINDER_INTERVAL_MS` controls how often it checks.
 
 ### Clinic-network gate
 
@@ -94,6 +113,9 @@ The CRM uses WhatsApp **deep links** (`https://wa.me/...`) — no external servi
 - **Appointments → Remind** — reminder message with date/time
 - **Billing → WhatsApp** — invoice with pending balance
 - **Client profile → WhatsApp** — quick contact
+- **Dashboard → WhatsApp reminders due** — appointments whose reminder is due today, with send + mark-sent buttons
+
+With `WHATSAPP_TOKEN` + `WHATSAPP_PHONE_ID` configured, the built-in scheduler sends these reminders automatically (see above).
 
 ## API overview
 
@@ -107,6 +129,7 @@ All routes are under `/api` and require a `Bearer` token from `POST /api/auth/lo
 | Billing | `GET/POST /api/invoices`, `GET/PUT /api/invoices/:id`, `POST /api/invoices/:id/payments` |
 | Inventory | `GET/POST /api/inventory`, `PUT /api/inventory/:id`, `POST /api/inventory/:id/restock`, `POST /api/inventory/:id/deduct`, `GET /api/inventory/purchases` |
 | Roles | `GET /api/roles`, `PUT /api/roles/:role` |
+| Reminders | `GET /api/reminders` (due), `PATCH /api/reminders/appointments/:id/reminder-sent` |
 | Reports | `GET /api/reports/summary` |
 
 ## Tests

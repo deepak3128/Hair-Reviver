@@ -13,6 +13,7 @@ const billingRoutes = require('./routes/billing');
 const staffRoutes = require('./routes/staff');
 const reportRoutes = require('./routes/reports');
 const roleRoutes = require('./routes/roles');
+const reminderRoutes = require('./routes/reminders');
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use('/api/invoices', billingRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/roles', roleRoutes);
+app.use('/api/reminders', reminderRoutes);
 
 // Serve the built frontend (Vite) so a single server runs the whole app.
 const DIST = path.join(__dirname, '..', '..', 'frontend', 'dist');
