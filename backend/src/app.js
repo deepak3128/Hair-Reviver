@@ -36,8 +36,10 @@ app.use('/api/roles', roleRoutes);
 app.use('/api/reminders', reminderRoutes);
 
 // Serve the built frontend (Vite) so a single server runs the whole app.
+// Skipped on Vercel — there the frontend is served as static files by Vercel
+// itself and only the API routes run as a serverless function.
 const DIST = path.join(__dirname, '..', '..', 'frontend', 'dist');
-if (fs.existsSync(path.join(DIST, 'index.html'))) {
+if (!process.env.VERCEL && fs.existsSync(path.join(DIST, 'index.html'))) {
   app.use(express.static(DIST));
 } else {
   app.get('/', (req, res) =>
