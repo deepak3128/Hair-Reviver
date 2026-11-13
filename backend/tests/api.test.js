@@ -120,6 +120,62 @@ test('adding a team member with an existing email is rejected', async () => {
   assert.equal(r.status, 409);
 });
 
+test('owner can revoke and restore a team member', async () => {
+  const owner = await (await login('neeraj@hairreviver.in', 'demo1234')).json();
+  const h = { Authorization: 'Bearer ' + owner.token, 'Content-Type': 'application/json' };
+  const email = 'revoke' + Date.now() + '@hairreviver.in';
+  const created = await (await fetch(base + '/api/staff', {
+    method: 'POST', headers: h,
+    body: JSON.stringify({ name: 'Revoke Me', email, password: 'clinic1234', role: 'staff' })
+  })).json();
+  const memberToken = (await (await login(email, 'clinic1234')).json()).token;
+
+  const revoke = await fetch(base + '/api/staff/' + created.member.id + '/access', {
+    method: 'PATCH', headers: h, body: JSON.stringify({ active: false })
+  });
+  assert.equal(revoke.status, 200);
+
+  assert.equal((await login(email, 'clinic1234')).status, 401);
+
+  const stale = await fetch(base + '/api/clients', { headers: { Authorization: 'Bearer ' + memberToken } });
+  assert.equal(stale.status, 401);
+
+  const restore = await fetch(base + '/api/staff/' + created.member.id + '/access', {
+    method: 'PATCH', headers: h, body: JSON.stringify({ active: true })
+  });
+  assert.equal(restore.status, 200);
+  assert.equal((await login(email, 'clinic1234')).status, 200);
+});
+
+test('owner can remove a team member but not themselves', async () => {
+  const owner = await (await login('neeraj@hairreviver.in', 'demo1234')).json();
+  const h = { Authorization: 'Bearer ' + owner.token, 'Content-Type': 'application/json' };
+  const email = 'remove' + Date.now() + '@hairreviver.in';
+  const created = await (await fetch(base + '/api/staff', {
+    method: 'POST', headers: h,
+    body: JSON.stringify({ name: 'Remove Me', email, password: 'clinic1234', role: 'technician' })
+  })).json();
+
+  const del = await fetch(base + '/api/staff/' + created.member.id, { method: 'DELETE', headers: h });
+  assert.equal(del.status, 200);
+  assert.equal((await login(email, 'clinic1234')).status, 401);
+
+  const list = await (await fetch(base + '/api/staff', { headers: h })).json();
+  assert.ok(!list.team.some((m) => m.id === created.member.id));
+
+  const self = await fetch(base + '/api/staff/' + owner.user.id, { method: 'DELETE', headers: h });
+  assert.equal(self.status, 400);
+});
+
+test('staff cannot revoke or remove team members', async () => {
+  const staff = await (await login('ritu@hairreviver.in', 'demo1234')).json();
+  const h = { Authorization: 'Bearer ' + staff.token, 'Content-Type': 'application/json' };
+  const r1 = await fetch(base + '/api/staff/T-01/access', { method: 'PATCH', headers: h, body: JSON.stringify({ active: false }) });
+  assert.equal(r1.status, 403);
+  const r2 = await fetch(base + '/api/staff/T-01', { method: 'DELETE', headers: h });
+  assert.equal(r2.status, 403);
+});
+
 test('invoices and reports respond', async () => {
   const { token } = await (await login('neeraj@hairreviver.in', 'demo1234')).json();
   const h = { Authorization: 'Bearer ' + token };

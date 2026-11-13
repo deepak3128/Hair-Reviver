@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: hair-reviver
+    runtime: node
+    plan: free
+    buildCommand: NPM_CONFIG_PRODUCTION=false npm install && npm run build
+    startCommand: npm start --prefix backend
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NPM_CONFIG_PRODUCTION
+        value: "false"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      - key: CLINIC_NETWORKS
+        value: "0.0.0.0/0"
+      - key: MONGOMS_DISTRO
+        value: ubuntu2204

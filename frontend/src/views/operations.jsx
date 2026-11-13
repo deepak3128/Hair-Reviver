@@ -496,6 +496,38 @@ function AddTeamMemberModal(props){
     )
   );
 }
+function RemoveMemberModal(props){
+  var member = props.member, set = props.set, onClose = props.onClose;
+  var busy = React.useState(false);
+  function remove(){
+    busy[1](true);
+    API.del('/staff/' + member.id)
+      .then(function(){
+        return API.get('/staff').then(function(res){
+          set(function(){ return { team: res.team }; });
+          toast(member.name + ' removed from the CRM', 'err');
+          onClose();
+        });
+      })
+      .catch(function(ex){ toast(ex.message, 'err'); })
+      .then(function(){ busy[1](false); });
+  }
+  return React.createElement(Modal, { title: 'Remove team member', onClose: onClose },
+    React.createElement('div', { className: 'row', style: { alignItems: 'flex-start', gap: 12, marginBottom: 4 } },
+      React.createElement('div', { style: { width: 38, height: 38, borderRadius: 12, display: 'grid', placeItems: 'center', background: 'var(--danger-soft)', color: 'var(--danger)', flex: 'none' } },
+        React.createElement(Icon, { i: 'alert', size: 20 })),
+      React.createElement('div', null,
+        React.createElement('div', { className: 'strong', style: { fontSize: 15 } }, 'Remove ' + member.name + '?'),
+        React.createElement('div', { className: 't-sub', style: { marginTop: 4 } },
+          'This permanently deletes their login and removes them from the CRM. They lose access immediately. Their appointment history is kept. This cannot be undone.')
+      )
+    ),
+    React.createElement('div', { className: 'modal-foot', style: { margin: '20px -22px -20px' } },
+      React.createElement(Btn, { kind: 'ghost', onClick: onClose }, 'Cancel'),
+      React.createElement(Btn, { kind: 'primary', cls: 'btn-danger', icon: 'trash', disabled: busy[0], onClick: remove }, busy[0] ? 'Removing…' : 'Remove member')
+    )
+  );
+}
 function RoleAccess(props){
   var st = props.st, set = props.set;
   var perms = st.perms || DEFAULT_PERMS;
@@ -565,9 +597,21 @@ function RoleAccess(props){
 function StaffView(props){
   var st = props.st, set = props.set, nav = props.nav, u = props.u;
   var addOpen = React.useState(false);
+  var removeMember = React.useState(null);
+  var isOwner = u && u.role === 'owner';
   var today = UT.today();
   var next7End = UT.addDays(today, 6);
   var team = (st.team && st.team.length) ? st.team : [DB.owner].concat(DB.staff, DB.technicians);
+  function refreshTeam(){
+    return API.get('/staff').then(function(res){ set(function(){ return { team: res.team }; }); });
+  }
+  function toggleAccess(m){
+    var next = m.active === false;
+    API.patch('/staff/' + m.id + '/access', { active: next })
+      .then(function(){ return refreshTeam(); })
+      .then(function(){ toast((next ? 'Access restored for ' : 'Access revoked for ') + m.name, next ? 'ok' : 'err'); })
+      .catch(function(ex){ toast(ex.message, 'err'); });
+  }
   var ranked = DB.technicians.slice().sort(function(a, b){ return b.completed - a.completed; });
   var maxLoad = 1;
   ranked.forEach(function(t){
@@ -582,7 +626,7 @@ function StaffView(props){
         React.createElement('div', { className: 'ph-sub' }, 'Front desk, technicians and workload')
       ),
       React.createElement('div', { className: 'page-actions' },
-        u && u.role === 'owner' ? React.createElement(Btn, { icon: 'plus', kind: 'primary', onClick: function(){ addOpen[1](true); }, dataid: 'btn-add-staff' }, 'Add team member') : null,
+        isOwner ? React.createElement(Btn, { icon: 'plus', kind: 'primary', onClick: function(){ addOpen[1](true); }, dataid: 'btn-add-staff' }, 'Add team member') : null,
         React.createElement(Btn, { icon: 'calendar', onClick: function(){ nav('appointments'); } }, 'Assign technicians')
       )
     ),
@@ -595,14 +639,15 @@ function StaffView(props){
           React.createElement('thead', null,
             React.createElement('tr', null,
               React.createElement('th', null, 'Team member'), React.createElement('th', null, 'Role'), React.createElement('th', { className: 'hide-md' }, 'Phone'),
-              React.createElement('th', { className: 'hide-sm' }, 'Joined'), React.createElement('th', null, 'Status'), React.createElement('th', { className: 'al-r' }, 'Load')
+              React.createElement('th', { className: 'hide-sm' }, 'Joined'), React.createElement('th', null, 'Status'), React.createElement('th', { className: 'al-r' }, 'Load'),
+              isOwner ? React.createElement('th', { className: 'al-r' }, 'Actions') : null
             )
           ),
           React.createElement('tbody', null,
             team.map(function(m){
               var isTech = m.role === 'technician' || m.rating !== undefined;
               var load = typeof m.load === 'number' ? m.load : (isTech ? st.appointments.filter(function(a){ return a.techId === m.id && a.date >= today && a.date <= next7End && a.status !== 'cancelled'; }).length : 0);
-              return React.createElement('tr', { key: m.id, 'data-od-id': 'staff-row-' + m.id },
+              return React.createElement('tr', { key: m.id, 'data-od-id': 'staff-row-' + m.id, style: m.active === false ? { opacity: 0.6 } : undefined },
                 React.createElement('td', null,
                   React.createElement('div', { className: 't-cell-main' },
                     React.createElement(Avatar, { name: m.name, size: 34 }),
@@ -615,8 +660,15 @@ function StaffView(props){
                 React.createElement('td', null, teamRoleLabel(m)),
                 React.createElement('td', { className: 'hide-md' }, m.phone),
                 React.createElement('td', { className: 'hide-sm' }, m.joined),
-                React.createElement('td', null, React.createElement(Chip, { s: 'active' }, 'Active')),
-                React.createElement('td', { className: 'al-r' }, isTech ? React.createElement('span', { className: 'mono strong' }, load + ' · next 7d') : React.createElement('span', { className: 'faint' }, '—'))
+                React.createElement('td', null, m.active === false ? React.createElement(Chip, { s: 'inactive' }, 'Revoked') : React.createElement(Chip, { s: 'active' }, 'Active')),
+                React.createElement('td', { className: 'al-r' }, isTech ? React.createElement('span', { className: 'mono strong' }, load + ' · next 7d') : React.createElement('span', { className: 'faint' }, '—')),
+                isOwner ? React.createElement('td', { className: 'al-r' },
+                  (m.role === 'owner' || (u && m.id === u.id)) ? React.createElement('span', { className: 'faint' }, '—') :
+                    React.createElement('div', { className: 'row', style: { justifyContent: 'flex-end', gap: 6 } },
+                      React.createElement(Btn, { size: 'sm', kind: 'quiet', icon: m.active === false ? 'check' : 'logOut', onClick: function(){ toggleAccess(m); } }, m.active === false ? 'Restore' : 'Revoke'),
+                      React.createElement(Btn, { size: 'sm', kind: 'quiet', icon: 'trash', onClick: function(){ removeMember[1](m); } }, 'Remove')
+                    )
+                ) : null
               );
             })
           )
@@ -654,7 +706,8 @@ function StaffView(props){
       })
     ),
 
-    addOpen[0] ? React.createElement(AddTeamMemberModal, { set: set, onClose: function(){ addOpen[1](false); } }) : null
+    addOpen[0] ? React.createElement(AddTeamMemberModal, { set: set, onClose: function(){ addOpen[1](false); } }) : null,
+    removeMember[0] ? React.createElement(RemoveMemberModal, { member: removeMember[0], set: set, onClose: function(){ removeMember[1](null); } }) : null
   );
 }
 

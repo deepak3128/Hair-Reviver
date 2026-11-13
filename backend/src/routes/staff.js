@@ -15,7 +15,7 @@ router.get('/', async (req, res, next) => {
     const todayS = today();
     const weekEnd = addDays(todayS, 6);
 
-    const members = await User.find({}, 'id name role phone joined rating completed onTime').sort({ role: 1, name: 1 }).lean();
+    const members = await User.find({}, 'id name role active phone joined rating completed onTime').sort({ role: 1, name: 1 }).lean();
 
     const result = await Promise.all(
       members.map(async (m) => {
@@ -69,6 +69,38 @@ router.post('/', async (req, res, next) => {
     res.status(201).json({ member: member.toSafe() });
   } catch (e) {
     if (e && e.code === 11000) return res.status(409).json({ error: 'A team member with this email already exists' });
+    next(e);
+  }
+});
+
+router.patch('/:id/access', async (req, res, next) => {
+  try {
+    const active = (req.body || {}).active;
+    if (typeof active !== 'boolean') return res.status(400).json({ error: 'active must be true or false' });
+
+    const member = await User.findOne({ id: req.params.id });
+    if (!member) return res.status(404).json({ error: 'Team member not found' });
+    if (member.role === 'owner') return res.status(400).json({ error: 'Owner access cannot be revoked' });
+    if (member.id === req.user.id) return res.status(400).json({ error: 'You cannot change your own access' });
+
+    member.active = active;
+    await member.save();
+    res.json({ member: member.toSafe() });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const member = await User.findOne({ id: req.params.id });
+    if (!member) return res.status(404).json({ error: 'Team member not found' });
+    if (member.role === 'owner') return res.status(400).json({ error: 'Owner account cannot be removed' });
+    if (member.id === req.user.id) return res.status(400).json({ error: 'You cannot remove your own account' });
+
+    await User.deleteOne({ id: member.id });
+    res.json({ ok: true, id: member.id });
+  } catch (e) {
     next(e);
   }
 });

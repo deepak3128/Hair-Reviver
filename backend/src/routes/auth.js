@@ -18,6 +18,10 @@ router.post('/login', async (req, res, next) => {
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
 
+    if (user.active === false) {
+      return res.status(401).json({ error: 'This account has been disabled. Ask the owner.' });
+    }
+
     if ((user.role === 'staff' || user.role === 'technician') && !isAllowed(req.ip)) {
       return res.status(401).json({
         error: 'Front Desk and Technician accounts can only sign in from the clinic network (clinic Wi-Fi).'

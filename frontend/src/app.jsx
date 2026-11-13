@@ -256,8 +256,9 @@ function Root(){
     }
   }
   function onLogin(email, password){
-    set({ booting: true });
-    return login(email, password).then(function(u){ return hydrate(u); });
+    return login(email, password)
+      .then(function(u){ return hydrate(u); })
+      .catch(function(e){ set({ booting: false }); throw e; });
   }
   function doLogout(){
     logout();
