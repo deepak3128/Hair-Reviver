@@ -134,9 +134,45 @@ function Sidebar(props){
 function Topbar(props){
   var st = props.st, u = props.u, nav = props.nav;
   var open = React.useState(false);
+  var readKey = 'hr-notif-read-' + (u.id || u.email);
+  var readState = React.useState(function(){
+    try { return JSON.parse(localStorage.getItem(readKey) || '[]'); } catch (e) { return []; }
+  });
+  var read = readState[0];
   var overdue = st.clients.filter(function(c){ return UT.daysUntil(UT.nextDue(c)) < 0; });
   var pending = st.invoices.filter(function(i){ return i.status !== 'paid'; });
-  var count = overdue.length + pending.length;
+  var items = overdue.map(function(c){
+    var due = UT.nextDue(c);
+    return {
+      key: 'o' + c.id + ':' + due,
+      name: c.name,
+      title: c.name + ' is overdue',
+      sub: 'Maintenance due ' + UT.fmtShort(due) + ' · ' + Math.abs(UT.daysUntil(due)) + 'd late',
+      go: function(){ nav('clients'); }
+    };
+  }).concat(pending.map(function(inv){
+    var c = st.clients.find(function(x){ return x.id === inv.clientId; });
+    return {
+      key: 'p' + inv.id,
+      name: c ? c.name : '?',
+      title: UT.fmtINR(inv.total - inv.paid) + ' due · ' + (c ? c.name : '—'),
+      sub: inv.id + ' · ' + inv.status,
+      go: function(){ nav('billing'); }
+    };
+  }));
+  var unread = items.filter(function(it){ return read.indexOf(it.key) < 0; });
+  var count = unread.length;
+  function markRead(keys){
+    var next = read.slice();
+    keys.forEach(function(k){ if (next.indexOf(k) < 0) next.push(k); });
+    readState[1](next);
+    try { localStorage.setItem(readKey, JSON.stringify(next)); } catch (e) {}
+  }
+  function openItem(it){
+    markRead([it.key]);
+    it.go();
+    open[1](false);
+  }
   return React.createElement('header', { className: 'topbar' },
     React.createElement('button', { className: 'icon-btn menu-btn', onClick: props.onMenu, 'aria-label': 'Menu' }, React.createElement(Icon, { i: 'menu' })),
     React.createElement('div', { className: 'tb-title' },
@@ -156,26 +192,19 @@ function Topbar(props){
         open[0] ? React.createElement('div', { className: 'notif-panel' },
           React.createElement('div', { className: 'notif-head' },
             React.createElement('h4', null, 'Notifications'),
-            React.createElement('button', { className: 'icon-btn', style: { width: 28, height: 28 }, onClick: function(){ open[1](false); }, 'aria-label': 'Close' }, React.createElement(Icon, { i: 'x', size: 14 }))
+            React.createElement('div', { className: 'row', style: { gap: 6 } },
+              count > 0 ? React.createElement('button', { className: 'btn btn-quiet btn-sm', style: { height: 28 }, onClick: function(){ markRead(unread.map(function(it){ return it.key; })); } }, 'Mark all read') : null,
+              React.createElement('button', { className: 'icon-btn', style: { width: 28, height: 28 }, onClick: function(){ open[1](false); }, 'aria-label': 'Close' }, React.createElement(Icon, { i: 'x', size: 14 }))
+            )
           ),
           count === 0 ? React.createElement('div', { className: 'notif-empty' }, 'All caught up — nothing needs attention.') :
             React.createElement('div', null,
-              overdue.map(function(c){
-                return React.createElement('div', { key: 'o' + c.id, className: 'notif-row', onClick: function(){ nav('clients'); open[1](false); } },
-                  React.createElement(Avatar, { name: c.name, size: 30 }),
+              unread.map(function(it){
+                return React.createElement('div', { key: it.key, className: 'notif-row', 'data-od-id': 'notif-' + it.key, onClick: function(){ openItem(it); } },
+                  React.createElement(Avatar, { name: it.name, size: 30 }),
                   React.createElement('div', { className: 'n-main' },
-                    React.createElement('div', { className: 'n-title' }, c.name, ' is overdue'),
-                    React.createElement('div', { className: 'n-sub' }, 'Maintenance due ', UT.fmtShort(UT.nextDue(c)), ' · ', Math.abs(UT.daysUntil(UT.nextDue(c))), 'd late')
-                  )
-                );
-              }),
-              pending.map(function(inv){
-                var c = st.clients.find(function(x){ return x.id === inv.clientId; });
-                return React.createElement('div', { key: 'p' + inv.id, className: 'notif-row', onClick: function(){ nav('billing'); open[1](false); } },
-                  React.createElement(Avatar, { name: c ? c.name : '?', size: 30 }),
-                  React.createElement('div', { className: 'n-main' },
-                    React.createElement('div', { className: 'n-title' }, UT.fmtINR(inv.total - inv.paid), ' due · ', c ? c.name : '—'),
-                    React.createElement('div', { className: 'n-sub' }, inv.id, ' · ', inv.status)
+                    React.createElement('div', { className: 'n-title' }, it.title),
+                    React.createElement('div', { className: 'n-sub' }, it.sub)
                   )
                 );
               })
