@@ -7,7 +7,7 @@ import { DEFAULT_PERMS } from '../lib/permissions';
 import { openWhatsApp, invoiceMsg } from '../lib/wa';
 var Icon = U.Icon, Chip = U.Chip, Avatar = U.Avatar, Card = U.Card, Section = U.Section,
     Field = U.Field, Select = U.Select, Input = U.Input, Btn = U.Btn, Modal = U.Modal,
-    Empty = U.Empty, toast = U.toast;
+    RowMenu = U.RowMenu, Empty = U.Empty, toast = U.toast;
 
 function clientOf(st, id){ return st.clients.find(function(c){ return c.id === id; }); }
 function invDue(i){ return i.total - i.paid; }
@@ -664,10 +664,14 @@ function StaffView(props){
                 React.createElement('td', { className: 'al-r' }, isTech ? React.createElement('span', { className: 'mono strong' }, load + ' · next 7d') : React.createElement('span', { className: 'faint' }, '—')),
                 isOwner ? React.createElement('td', { className: 'al-r' },
                   (m.role === 'owner' || (u && m.id === u.id)) ? React.createElement('span', { className: 'faint' }, '—') :
-                    React.createElement('div', { className: 'row', style: { justifyContent: 'flex-end', gap: 6 } },
-                      React.createElement(Btn, { size: 'sm', kind: 'quiet', icon: m.active === false ? 'check' : 'logOut', onClick: function(){ toggleAccess(m); } }, m.active === false ? 'Restore' : 'Revoke'),
-                      React.createElement(Btn, { size: 'sm', kind: 'quiet', icon: 'trash', onClick: function(){ removeMember[1](m); } }, 'Remove')
-                    )
+                    React.createElement(RowMenu, {
+                      label: 'Actions for ' + m.name,
+                      dataid: 'staff-menu-' + m.id,
+                      items: [
+                        { label: m.active === false ? 'Restore access' : 'Revoke access', icon: m.active === false ? 'check' : 'logOut', onClick: function(){ toggleAccess(m); } },
+                        { label: 'Remove member', icon: 'trash', tone: 'danger', onClick: function(){ removeMember[1](m); } }
+                      ]
+                    })
                 ) : null
               );
             })

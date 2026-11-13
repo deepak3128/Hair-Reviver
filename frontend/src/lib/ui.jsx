@@ -29,6 +29,7 @@ var ICONS = {
   trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
   repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
   menu: '<path d="M3 6h18M3 12h18M3 18h18"/>',
+  dots: '<circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/>',
   rupee: '<path d="M6 3h12M6 8h12M6 3c3 0 5.5 2 5.5 5S9 13 6 13l7 8"/>',
   wallet: '<path d="M20 7H4a2 2 0 0 1 0-4h14v4"/><path d="M20 7v14H4a2 2 0 0 1-2-2V5"/><path d="M15 13h2"/>',
   refresh: '<path d="M21 12a9 9 0 0 1-15.5 6.36L3 16m0-4a9 9 0 0 1 15.5-6.36L21 8"/><path d="M3 5v4h4M21 15v-4h-4"/>',
@@ -168,6 +169,77 @@ function Modal(props){
   );
 }
 
+function RowMenu(props){
+  var items = props.items || [];
+  var open = React.useState(false);
+  var pos = React.useState({ top: 0, left: 0 });
+  var btnRef = React.useRef(null);
+  var menuRef = React.useRef(null);
+
+  function place(){
+    if (!btnRef.current) return;
+    var r = btnRef.current.getBoundingClientRect();
+    var w = 176;
+    var h = items.length * 38 + 12;
+    var left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
+    var top = r.bottom + 6;
+    if (top + h > window.innerHeight - 8 && r.top > h + 8) top = r.top - h - 6;
+    pos[1]({ top: top, left: left });
+  }
+  function toggle(){
+    if (open[0]) { open[1](false); return; }
+    place();
+    open[1](true);
+  }
+  React.useEffect(function(){
+    if (!open[0]) return;
+    function onDoc(e){
+      if (menuRef.current && menuRef.current.contains(e.target)) return;
+      if (btnRef.current && btnRef.current.contains(e.target)) return;
+      open[1](false);
+    }
+    function onKey(e){ if (e.key === 'Escape') open[1](false); }
+    function onView(){ open[1](false); }
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onView);
+    window.addEventListener('scroll', onView, true);
+    return function(){
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onView);
+      window.removeEventListener('scroll', onView, true);
+    };
+  }, [open[0]]);
+
+  return React.createElement(React.Fragment, null,
+    React.createElement('button', {
+      ref: btnRef,
+      className: 'icon-btn' + (open[0] ? ' is-on' : ''),
+      onClick: toggle,
+      'aria-label': props.label || 'More actions',
+      'aria-haspopup': 'menu',
+      'data-od-id': props.dataid
+    }, React.createElement(Icon, { i: 'dots', size: 18 })),
+    open[0] ? createPortal(
+      React.createElement('div', { className: 'rowmenu', ref: menuRef, style: { top: pos[0].top, left: pos[0].left }, role: 'menu' },
+        items.map(function(it, i){
+          return React.createElement('button', {
+            key: i,
+            className: 'rowmenu-item' + (it.tone === 'danger' ? ' is-danger' : ''),
+            role: 'menuitem',
+            onClick: function(){ open[1](false); if (it.onClick) it.onClick(); }
+          },
+            it.icon ? React.createElement(Icon, { i: it.icon, size: 16 }) : null,
+            React.createElement('span', null, it.label)
+          );
+        })
+      ),
+      document.body
+    ) : null
+  );
+}
+
 function Empty(props){
   return React.createElement('div', { className: 'empty' },
     React.createElement(Icon, { i: props.icon || 'box', size: 30 }),
@@ -243,6 +315,7 @@ export const UI = {
   Input: Input,
   Btn: Btn,
   Modal: Modal,
+  RowMenu: RowMenu,
   Empty: Empty,
   Bars: Bars,
   Kpi: Kpi,
