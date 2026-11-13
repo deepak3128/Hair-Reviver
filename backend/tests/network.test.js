@@ -30,6 +30,17 @@ test('unit: isAllowed matches CIDRs', () => {
   assert.equal(isAllowed('::ffff:10.0.0.9'), true, 'ipv4-mapped ipv6');
 });
 
+test('unit: default networks allow localhost over IPv6 loopback', () => {
+  const saved = process.env.CLINIC_NETWORKS;
+  delete process.env.CLINIC_NETWORKS;
+  try {
+    assert.equal(isAllowed('::1'), true, '::1 is localhost');
+    assert.equal(isAllowed('::ffff:127.0.0.1'), true, 'ipv4-mapped loopback');
+  } finally {
+    process.env.CLINIC_NETWORKS = saved;
+  }
+});
+
 test('owner can sign in from anywhere (no clinic IP)', async () => {
   const r = await fetch(base + '/api/auth/login', {
     method: 'POST',

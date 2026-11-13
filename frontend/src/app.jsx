@@ -223,7 +223,7 @@ function emptyState(){
     user: null,
     booting: true,
     route: { view: 'dashboard', params: {} },
-    clients: [], appointments: [], invoices: [], inventory: [], purchases: [],
+    clients: [], appointments: [], invoices: [], inventory: [], purchases: [], team: [],
     packages: DB.packages.map(function(p){ return Object.assign({}, p, { members: p.members.slice() }); }),
     perms: { owner: DEFAULT_PERMS.owner.slice(), staff: DEFAULT_PERMS.staff.slice(), technician: DEFAULT_PERMS.technician.slice() }
   };
@@ -242,6 +242,12 @@ function Root(){
   async function hydrate(u){
     try {
       var data = await loadAll();
+      if (u && u.role === 'owner'){
+        try {
+          var team = await API.get('/staff');
+          data.team = team.team;
+        } catch (e) {}
+      }
       set(function(s){ return Object.assign({}, s, data, { user: u, booting: false }); });
     } catch (e) {
       setToken(null);

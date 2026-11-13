@@ -81,6 +81,45 @@ test('technician cannot create clients', async () => {
   assert.equal(r.status, 403);
 });
 
+test('owner can add a team member who can sign in', async () => {
+  const { token } = await (await login('neeraj@hairreviver.in', 'demo1234')).json();
+  const email = 'newtech' + Date.now() + '@hairreviver.in';
+  const r = await fetch(base + '/api/staff', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'New Tech', email, password: 'clinic1234', role: 'technician', phone: '+91 90000 11111' })
+  });
+  assert.equal(r.status, 201);
+  const body = await r.json();
+  assert.equal(body.member.role, 'technician');
+  assert.match(body.member.id, /^T-\d+$/);
+
+  const loginRes = await login(email, 'clinic1234');
+  assert.equal(loginRes.status, 200);
+  const logged = await loginRes.json();
+  assert.equal(logged.user.email, email);
+});
+
+test('only the owner can add team members', async () => {
+  const { token } = await (await login('ritu@hairreviver.in', 'demo1234')).json();
+  const r = await fetch(base + '/api/staff', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'Nope', email: 'nope@hairreviver.in', password: 'clinic1234', role: 'staff' })
+  });
+  assert.equal(r.status, 403);
+});
+
+test('adding a team member with an existing email is rejected', async () => {
+  const { token } = await (await login('neeraj@hairreviver.in', 'demo1234')).json();
+  const r = await fetch(base + '/api/staff', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'Duplicate', email: 'ritu@hairreviver.in', password: 'clinic1234', role: 'staff' })
+  });
+  assert.equal(r.status, 409);
+});
+
 test('invoices and reports respond', async () => {
   const { token } = await (await login('neeraj@hairreviver.in', 'demo1234')).json();
   const h = { Authorization: 'Bearer ' + token };

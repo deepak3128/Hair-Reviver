@@ -437,6 +437,65 @@ var ACCESS_ROLES = [
   { id: 'technician', name: 'Technician', sub: 'Performs services, updates status, logs stock usage' },
   { id: 'staff', name: 'Front Desk', sub: 'Handles clients, bookings and billing entry' }
 ];
+function teamRoleLabel(m){
+  if (m.role === 'owner') return 'Owner / Admin';
+  if (m.role === 'staff') return 'Front Desk';
+  if (m.role === 'technician') return 'Technician';
+  return m.role;
+}
+function AddTeamMemberModal(props){
+  var set = props.set, onClose = props.onClose;
+  var f = {
+    name: React.useState(''), email: React.useState(''), phone: React.useState('+91 '),
+    role: React.useState('staff'), password: React.useState('')
+  };
+  var busy = React.useState(false);
+  function submit(e){
+    e.preventDefault();
+    if (!f.name[0].trim()){ toast('Enter the team member name', 'err'); return; }
+    if (!f.email[0].trim()){ toast('Enter the email they will sign in with', 'err'); return; }
+    if (f.password[0].length < 6){ toast('Password must be at least 6 characters', 'err'); return; }
+    busy[1](true);
+    API.post('/staff', {
+      name: f.name[0].trim(), email: f.email[0].trim(), phone: f.phone[0].trim(),
+      role: f.role[0], password: f.password[0]
+    })
+      .then(function(res){
+        return API.get('/staff').then(function(team){
+          set(function(){ return { team: team.team }; });
+          toast(res.member.name + ' added — they can sign in with ' + res.member.email);
+          onClose();
+        });
+      })
+      .catch(function(ex){ toast(ex.message, 'err'); })
+      .then(function(){ busy[1](false); });
+  }
+  return React.createElement(Modal, { title: 'Add team member', onClose: onClose },
+    React.createElement('form', { onSubmit: submit },
+      React.createElement('div', { className: 't-sub', style: { margin: '-4px 0 14px' } }, 'Create a login for a front desk or technician team member. Only the owner can add accounts.'),
+      React.createElement('div', { className: 'frow' },
+        React.createElement(Field, { label: 'Full name' },
+          React.createElement(Input, { placeholder: 'e.g. Aditi Rao', value: f.name[0], onChange: function(e){ f.name[1](e.target.value); } })),
+        React.createElement(Field, { label: 'Phone' },
+          React.createElement(Input, { placeholder: '+91 98…', value: f.phone[0], onChange: function(e){ f.phone[1](e.target.value); } }))
+      ),
+      React.createElement('div', { className: 'frow' },
+        React.createElement(Field, { label: 'Email (login)' },
+          React.createElement(Input, { type: 'email', placeholder: 'name@hairreviver.in', value: f.email[0], onChange: function(e){ f.email[1](e.target.value); } })),
+        React.createElement(Field, { label: 'Role' },
+          React.createElement(Select, { value: f.role[0], onChange: function(e){ f.role[1](e.target.value); } },
+            React.createElement('option', { value: 'staff' }, 'Front Desk'),
+            React.createElement('option', { value: 'technician' }, 'Technician')))
+      ),
+      React.createElement(Field, { label: 'Temporary password', hint: 'At least 6 characters — share it with them so they can sign in.' },
+        React.createElement(Input, { type: 'text', placeholder: 'e.g. clinic1234', value: f.password[0], onChange: function(e){ f.password[1](e.target.value); } })),
+      React.createElement('div', { className: 'modal-foot', style: { margin: '20px -22px -20px' } },
+        React.createElement(Btn, { kind: 'ghost', onClick: onClose }, 'Cancel'),
+        React.createElement(Btn, { kind: 'primary', type: 'submit', icon: 'plus', disabled: busy[0] }, busy[0] ? 'Adding…' : 'Add team member')
+      )
+    )
+  );
+}
 function RoleAccess(props){
   var st = props.st, set = props.set;
   var perms = st.perms || DEFAULT_PERMS;
@@ -464,14 +523,12 @@ function RoleAccess(props){
       })
       .catch(function(ex){ toast(ex.message, 'err'); });
   }
-  return React.createElement('div', { className: 'card', style: { marginTop: 24 } },
-    React.createElement('div', { className: 'card-head', style: { paddingBottom: 4 } },
-      React.createElement('div', null,
-        React.createElement('h3', { style: { margin: 0 } }, 'Role access'),
-        React.createElement('div', { className: 't-sub', style: { marginTop: 2 } }, 'Choose which modules each role can open. Changes apply instantly and are saved in this browser.')
-      )
+  return React.createElement('div', { className: 'card card-pad', style: { marginTop: 24 } },
+    React.createElement('div', null,
+      React.createElement('h3', { style: { margin: 0 } }, 'Role access'),
+      React.createElement('div', { className: 't-sub', style: { marginTop: 2 } }, 'Choose which modules each role can open. Changes apply instantly and are saved in this browser.')
     ),
-    React.createElement('div', { className: 'perm-table', style: { marginTop: 10 } },
+    React.createElement('div', { className: 'perm-table', style: { marginTop: 14 } },
       React.createElement('div', { className: 'perm-row perm-head' },
         React.createElement('div', { className: 'perm-role' }, 'Role'),
         ACCESS_MODULES.map(function(m){
@@ -498,7 +555,7 @@ function RoleAccess(props){
         );
       })
     ),
-    React.createElement('div', { className: 't-sub', style: { marginTop: 10 } },
+    React.createElement('div', { className: 't-sub', style: { marginTop: 14 } },
       'Owner / Admin always has full access and cannot be changed here.'
     )
   );
@@ -507,8 +564,10 @@ function RoleAccess(props){
 /* ---------------- Staff ---------------- */
 function StaffView(props){
   var st = props.st, set = props.set, nav = props.nav, u = props.u;
+  var addOpen = React.useState(false);
   var today = UT.today();
   var next7End = UT.addDays(today, 6);
+  var team = (st.team && st.team.length) ? st.team : [DB.owner].concat(DB.staff, DB.technicians);
   var ranked = DB.technicians.slice().sort(function(a, b){ return b.completed - a.completed; });
   var maxLoad = 1;
   ranked.forEach(function(t){
@@ -523,6 +582,7 @@ function StaffView(props){
         React.createElement('div', { className: 'ph-sub' }, 'Front desk, technicians and workload')
       ),
       React.createElement('div', { className: 'page-actions' },
+        u && u.role === 'owner' ? React.createElement(Btn, { icon: 'plus', kind: 'primary', onClick: function(){ addOpen[1](true); }, dataid: 'btn-add-staff' }, 'Add team member') : null,
         React.createElement(Btn, { icon: 'calendar', onClick: function(){ nav('appointments'); } }, 'Assign technicians')
       )
     ),
@@ -539,9 +599,9 @@ function StaffView(props){
             )
           ),
           React.createElement('tbody', null,
-            [DB.owner].concat(DB.staff, DB.technicians).map(function(m){
-              var isTech = m.rating !== undefined;
-              var load = isTech ? st.appointments.filter(function(a){ return a.techId === m.id && a.date >= today && a.date <= next7End && a.status !== 'cancelled'; }).length : 0;
+            team.map(function(m){
+              var isTech = m.role === 'technician' || m.rating !== undefined;
+              var load = typeof m.load === 'number' ? m.load : (isTech ? st.appointments.filter(function(a){ return a.techId === m.id && a.date >= today && a.date <= next7End && a.status !== 'cancelled'; }).length : 0);
               return React.createElement('tr', { key: m.id, 'data-od-id': 'staff-row-' + m.id },
                 React.createElement('td', null,
                   React.createElement('div', { className: 't-cell-main' },
@@ -552,7 +612,7 @@ function StaffView(props){
                     )
                   )
                 ),
-                React.createElement('td', null, m.role),
+                React.createElement('td', null, teamRoleLabel(m)),
                 React.createElement('td', { className: 'hide-md' }, m.phone),
                 React.createElement('td', { className: 'hide-sm' }, m.joined),
                 React.createElement('td', null, React.createElement(Chip, { s: 'active' }, 'Active')),
@@ -592,7 +652,9 @@ function StaffView(props){
           React.createElement('div', { className: 'mini-stat', style: { marginTop: 10 } }, React.createElement('b', null, t.onTime), '% on-time · on-time completion')
         );
       })
-    )
+    ),
+
+    addOpen[0] ? React.createElement(AddTeamMemberModal, { set: set, onClose: function(){ addOpen[1](false); } }) : null
   );
 }
 

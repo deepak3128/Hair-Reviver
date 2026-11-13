@@ -18,7 +18,9 @@ function parseNetworks() {
 
 function normalizeIp(ip) {
   if (!ip) return null;
-  ip = String(ip).trim();
+  ip = String(ip).trim().replace(/^\[|\]$/g, '');
+  // "localhost" resolves to the IPv6 loopback ::1 first on most systems.
+  if (ip === '::1' || ip === '0:0:0:0:0:0:0:1') return '127.0.0.1';
   const m = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
   return m ? m[1] : ip;
 }
