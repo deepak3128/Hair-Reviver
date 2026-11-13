@@ -82,7 +82,7 @@ Copy `backend/.env.example` to `backend/.env` and adjust if needed:
 | `JWT_SECRET`       | Secret for login tokens. Change in production. |
 | `SIM_TODAY`        | Demo date for "overdue / due today / this month". Leave empty for the real date. |
 | `MONGOMS_DISTRO`   | In-memory MongoDB binary flavor. Ubuntu-based distros (incl. Kali) need `ubuntu2204`. |
-| `CLINIC_NETWORKS`  | Comma-separated CIDRs the staff/technician gate allows. Default: `192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,127.0.0.0/8` |
+| `CLINIC_NETWORKS`  | Optional. Comma-separated CIDRs that staff/technician accounts are restricted to. Leave empty (default) to allow any network. |
 | `WHATSAPP_TOKEN`   | WhatsApp Cloud API token. Leave empty to keep manual one-tap reminder buttons. |
 | `WHATSAPP_PHONE_ID`| WhatsApp Cloud API phone number ID (required together with the token). |
 | `REMINDER_INTERVAL_MS` | How often the reminder scheduler checks, in ms (default `300000` = 5 min). |
@@ -104,7 +104,7 @@ Two levels, both work out of the box:
 
 ### Clinic-network gate
 
-The backend inspects the client IP (`trust proxy` is enabled). For LAN access set `CLINIC_NETWORKS` to your clinic subnet, e.g. `192.168.1.0/24`. Owner accounts are never restricted. The gate is enforced at login and on every authenticated request.
+The gate is **off by default**, so front desk and technician accounts can sign in from anywhere (localhost, Vercel, Render). To restrict them to the clinic Wi-Fi, set `CLINIC_NETWORKS` to your clinic subnet, e.g. `192.168.1.0/24` (comma-separate multiple CIDRs). Owner accounts are never restricted. When enabled, the gate is enforced at login and on every authenticated request.
 
 ## WhatsApp reminders & invoices
 
@@ -163,7 +163,7 @@ Runs the backend test suite (auth, roles, clients, appointments, billing, invent
 ## Deployment
 
 1. `npm install`
-2. Set `MONGODB_URI` to your persistent MongoDB (Atlas), change `JWT_SECRET`, set `CLINIC_NETWORKS` to the clinic subnet
+2. Set `MONGODB_URI` to your persistent MongoDB (Atlas) and change `JWT_SECRET` (leave `CLINIC_NETWORKS` empty unless you want the LAN gate)
 3. `npm start` — serves the built SPA + API on one port
 
 For the clinic-network gate to see real client IPs behind a reverse proxy, forward `X-Forwarded-For` (`trust proxy` is already enabled server-side).

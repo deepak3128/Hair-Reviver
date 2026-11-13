@@ -5,15 +5,21 @@
  * when the request comes from the clinic Wi-Fi / LAN, identified by client IP.
  * Owner / Admin is never restricted and can work from anywhere.
  *
- * Allowed networks are configured with the CLINIC_NETWORKS env var
- * (comma-separated CIDRs). Defaults to the private LAN ranges plus localhost
- * so local development works out of the box.
+ * The gate is OFF by default so the app works from anywhere (localhost, Vercel,
+ * Render). To enforce it, set CLINIC_NETWORKS to a comma-separated list of
+ * CIDRs (e.g. "192.168.1.0/24"). A value of "*", "all", "0.0.0.0/0" or "::/0"
+ * keeps it off.
  */
 
 function parseNetworks() {
   const raw = (process.env.CLINIC_NETWORKS || '').trim();
-  if (raw) return raw.split(',').map((s) => s.trim()).filter(Boolean);
-  return ['192.168.0.0/16', '10.0.0.0/8', '172.16.0.0/12', '127.0.0.0/8'];
+  if (!raw) return null;
+  const list = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  const open = list.some((s) => {
+    const v = s.toLowerCase();
+    return v === '*' || v === 'all' || v === '0.0.0.0/0' || v === '::/0';
+  });
+  return open ? null : list;
 }
 
 function normalizeIp(ip) {
@@ -44,7 +50,9 @@ function ipInCidr(ip, cidr) {
 }
 
 function isAllowed(ip) {
-  return parseNetworks().some((cidr) => ipInCidr(ip, cidr));
+  const networks = parseNetworks();
+  if (!networks) return true;
+  return networks.some((cidr) => ipInCidr(ip, cidr));
 }
 
 function clinicOnly(req, res, next) {

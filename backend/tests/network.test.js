@@ -30,12 +30,16 @@ test('unit: isAllowed matches CIDRs', () => {
   assert.equal(isAllowed('::ffff:10.0.0.9'), true, 'ipv4-mapped ipv6');
 });
 
-test('unit: default networks allow localhost over IPv6 loopback', () => {
+test('unit: gate is open when CLINIC_NETWORKS is unset or wildcard', () => {
   const saved = process.env.CLINIC_NETWORKS;
   delete process.env.CLINIC_NETWORKS;
   try {
-    assert.equal(isAllowed('::1'), true, '::1 is localhost');
-    assert.equal(isAllowed('::ffff:127.0.0.1'), true, 'ipv4-mapped loopback');
+    assert.equal(isAllowed('::1'), true, 'no env = allow all (IPv6 loopback)');
+    assert.equal(isAllowed('203.0.113.9'), true, 'no env = allow public IP');
+    process.env.CLINIC_NETWORKS = '*';
+    assert.equal(isAllowed('203.0.113.9'), true, 'wildcard = allow all');
+    process.env.CLINIC_NETWORKS = '0.0.0.0/0';
+    assert.equal(isAllowed('203.0.113.9'), true, '0.0.0.0/0 = allow all');
   } finally {
     process.env.CLINIC_NETWORKS = saved;
   }
